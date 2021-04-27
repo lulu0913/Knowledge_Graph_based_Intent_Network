@@ -15,7 +15,6 @@ device = torch.device("cuda:" + str(args.gpu_id)) if args.cuda else torch.device
 BATCH_SIZE = args.test_batch_size
 batch_test_flag = args.batch_test_flag
 
-
 def ranklist_by_heapq(user_pos_test, test_items, rating, Ks):
     item_score = {}
     for i in test_items:
@@ -78,29 +77,46 @@ def get_performance(user_pos_test, r, auc, Ks):
             'ndcg': np.array(ndcg), 'hit_ratio': np.array(hit_ratio), 'auc': auc}
 
 
-def test_one_user(x):
+def test_one_user(x, train_user_set, test_user_set):
     # user u's ratings for user u
-    rating = x[0]
-    # uid
-    u = x[1]
-    # user u's items in the training set
-    try:
-        training_items = train_user_set[u]
-    except Exception:
-        training_items = []
-    # user u's items in the test set
-    user_pos_test = test_user_set[u]
-
-    all_items = set(range(0, n_items))
-
-    test_items = list(all_items - set(training_items))
-
-    if args.test_flag == 'part':
-        r, auc = ranklist_by_heapq(user_pos_test, test_items, rating, Ks)
-    else:
-        r, auc = ranklist_by_sorted(user_pos_test, test_items, rating, Ks)
-
-    return get_performance(user_pos_test, r, auc, Ks)
+    res = []
+    for item in x:
+        rating = item[0]
+        u = item[1]
+        try:
+            training_items = train_user_set[u]
+        except Exception:
+            training_items = []
+        user_pos_test = test_user_set[u]
+        all_items = set(range(0, n_items))
+        test_items = list(all_items - set(training_items))
+        if args.test_flag == 'part':
+            r, auc = ranklist_by_heapq(user_pos_test, test_items, rating, Ks)
+        else:
+            r, auc = ranklist_by_sorted(user_pos_test, test_items, rating, Ks)
+        res.append(get_performance(user_pos_test, r, auc, Ks))
+    return res
+    # rating = x[0]
+    # # uid
+    # u = x[1]
+    # # user u's items in the training set
+    # try:
+    #     training_items = train_user_set[u]
+    # except Exception:
+    #     training_items = []
+    # # user u's items in the test set
+    # user_pos_test = test_user_set[u]
+    #
+    # all_items = set(range(0, n_items))
+    #
+    # test_items = list(all_items - set(training_items))
+    #
+    # if args.test_flag == 'part':
+    #     r, auc = ranklist_by_heapq(user_pos_test, test_items, rating, Ks)
+    # else:
+    #     r, auc = ranklist_by_sorted(user_pos_test, test_items, rating, Ks)
+    #
+    # return get_performance(user_pos_test, r, auc, Ks)
 
 
 def test(model, user_dict, n_params):
@@ -165,7 +181,7 @@ def test(model, user_dict, n_params):
             rate_batch = model.rating(u_g_embeddings, i_g_embddings).detach().cpu()
 
         user_batch_rating_uid = zip(rate_batch, user_list_batch)
-        batch_result = pool.map(test_one_user, user_batch_rating_uid)
+        batch_result = test_one_user(user_batch_rating_uid, train_user_set, test_user_set)
         count += len(batch_result)
 
         for re in batch_result:

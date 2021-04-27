@@ -93,7 +93,8 @@ class GraphConv(nn.Module):
         noise_shape = x._nnz()
 
         random_tensor = rate
-        random_tensor += torch.rand(noise_shape).to(x.device)
+        # random_tensor += torch.rand(noise_shape).to(x.device)
+        random_tensor += torch.rand(noise_shape).to(x.cpu())
         dropout_mask = torch.floor(random_tensor).type(torch.bool)
         i = x._indices()
         v = x._values()
@@ -101,7 +102,8 @@ class GraphConv(nn.Module):
         i = i[:, dropout_mask]
         v = v[dropout_mask]
 
-        out = torch.sparse.FloatTensor(i, v, x.shape).to(x.device)
+        # out = torch.sparse.FloatTensor(i, v, x.shape).to(x.device)
+        out = torch.sparse.FloatTensor(i, v, x.shape).to(x.cpu())
         return out * (1. / (1 - rate))
 
     # def _cul_cor_pro(self):
@@ -130,8 +132,10 @@ class GraphConv(nn.Module):
             # tensor_1, tensor_2: [channel]
             # ref: https://en.wikipedia.org/wiki/Distance_correlation
             channel = tensor_1.shape[0]
-            zeros = torch.zeros(channel, channel).to(tensor_1.device)
-            zero = torch.zeros(1).to(tensor_1.device)
+            # zeros = torch.zeros(channel, channel).to(tensor_1.device)
+            zeros = torch.zeros(channel, channel).to(tensor_1.cpu())
+            # zero = torch.zeros(1).to(tensor_1.device)
+            zero = torch.zeros(1).to(tensor_1.cpu())
             tensor_1, tensor_2 = tensor_1.unsqueeze(-1), tensor_2.unsqueeze(-1)
             """cul distance matrix"""
             a_, b_ = torch.matmul(tensor_1, tensor_1.t()) * 2, \
@@ -227,6 +231,7 @@ class Recommender(nn.Module):
         self.ind = args_config.ind
         self.device = torch.device("cuda:" + str(args_config.gpu_id)) if args_config.cuda \
                                                                       else torch.device("cpu")
+        # self.device = torch.device("cpu")
 
         self.adj_mat = adj_mat
         self.graph = graph
@@ -244,7 +249,8 @@ class Recommender(nn.Module):
         self.latent_emb = initializer(torch.empty(self.n_factors, self.emb_size))
 
         # [n_users, n_entities]
-        self.interact_mat = self._convert_sp_mat_to_sp_tensor(self.adj_mat).to(self.device)
+        # self.interact_mat = self._convert_sp_mat_to_sp_tensor(self.adj_mat).to(self.device)
+        self.interact_mat = self._convert_sp_mat_to_sp_tensor(self.adj_mat).cpu()
 
     def _init_model(self):
         return GraphConv(channel=self.emb_size,
@@ -271,7 +277,8 @@ class Recommender(nn.Module):
         graph_tensor = torch.tensor(list(graph.edges))  # [-1, 3]
         index = graph_tensor[:, :-1]  # [-1, 2]
         type = graph_tensor[:, -1]  # [-1, 1]
-        return index.t().long().to(self.device), type.long().to(self.device)
+        # return index.t().long().to(self.device), type.long().to(self.device)
+        return index.t().long().cpu(), type.long().cpu()
 
     def forward(self, batch=None):
         user = batch['users']

@@ -5,7 +5,7 @@ Created on July 1, 2020
 __author__ = "huangtinglin"
 
 import random
-
+import os
 import torch
 import numpy as np
 
@@ -39,11 +39,12 @@ def get_feed_dict(train_entity_pairs, start, end, train_user_set):
         return neg_items
 
     feed_dict = {}
-    entity_pairs = train_entity_pairs[start:end].to(device)
+    # entity_pairs = train_entity_pairs[start:end].to(device)
+    entity_pairs = train_entity_pairs[start:end].cpu()
     feed_dict['users'] = entity_pairs[:, 0]
     feed_dict['pos_items'] = entity_pairs[:, 1]
-    feed_dict['neg_items'] = torch.LongTensor(negative_sampling(entity_pairs,
-                                                                train_user_set)).to(device)
+    # feed_dict['neg_items'] = torch.LongTensor(negative_sampling(entity_pairs, train_user_set)).to(device)
+    feed_dict['neg_items'] = torch.LongTensor(negative_sampling(entity_pairs, train_user_set)).cpu()
     return feed_dict
 
 
@@ -53,9 +54,9 @@ if __name__ == '__main__':
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+    # torch.cuda.manual_seed_all(seed)
+    # torch.backends.cudnn.deterministic = True
+    # torch.backends.cudnn.benchmark = False
 
     """read args"""
     global args, device
@@ -114,8 +115,13 @@ if __name__ == '__main__':
 
         train_e_t = time()
 
-        if epoch % 10 == 9 or epoch == 1:
+        if epoch % 10 == 9 or epoch == 0:
             """testing"""
+            state_model = {'net': model.state_dict(), 'optimizer': optimizer.state_dict(), 'epoch': epoch}
+            torch.save(state_model, os.path.join(os.getcwd(), "result", 'epoch-' + str(epoch) + '.model'))
+            if 1:
+                break
+
             test_s_t = time()
             ret = test(model, user_dict, n_params)
             test_e_t = time()
