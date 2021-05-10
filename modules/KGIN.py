@@ -10,7 +10,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import matplotlib.pyplot as plt
 from torch_scatter import scatter_mean
+from sklearn import datasets
+from sklearn.manifold import TSNE
 
 
 class Aggregator(nn.Module):
@@ -46,8 +49,12 @@ class Aggregator(nn.Module):
         disen_weight = torch.mm(nn.Softmax(dim=-1)(disen_weight_att),
                                 weight).expand(n_users, n_factors, channel)
         user_agg = user_agg * (disen_weight * score).sum(dim=1) + user_agg  # [n_users, channel]
+        # user_agg = user_agg * (disen_weight * score).sum(dim=1)  # [n_users, channel]
 
-        return entity_agg, user_agg
+        """draw user group"""
+        score1 = nn.Softmax(dim=1)(score_)
+
+        return entity_agg, user_agg, score1
 
 
 class GraphConv(nn.Module):
@@ -93,8 +100,7 @@ class GraphConv(nn.Module):
         noise_shape = x._nnz()
 
         random_tensor = rate
-        # random_tensor += torch.rand(noise_shape).to(x.device)
-        random_tensor += torch.rand(noise_shape).to(x.cpu())
+        random_tensor += torch.rand(noise_shape).to(x.device)
         dropout_mask = torch.floor(random_tensor).type(torch.bool)
         i = x._indices()
         v = x._values()
@@ -102,8 +108,7 @@ class GraphConv(nn.Module):
         i = i[:, dropout_mask]
         v = v[dropout_mask]
 
-        # out = torch.sparse.FloatTensor(i, v, x.shape).to(x.device)
-        out = torch.sparse.FloatTensor(i, v, x.shape).to(x.cpu())
+        out = torch.sparse.FloatTensor(i, v, x.shape).to(x.device)
         return out * (1. / (1 - rate))
 
     # def _cul_cor_pro(self):
@@ -132,10 +137,8 @@ class GraphConv(nn.Module):
             # tensor_1, tensor_2: [channel]
             # ref: https://en.wikipedia.org/wiki/Distance_correlation
             channel = tensor_1.shape[0]
-            # zeros = torch.zeros(channel, channel).to(tensor_1.device)
-            zeros = torch.zeros(channel, channel).to(tensor_1.cpu())
-            # zero = torch.zeros(1).to(tensor_1.device)
-            zero = torch.zeros(1).to(tensor_1.cpu())
+            zeros = torch.zeros(channel, channel).to(tensor_1.device)
+            zero = torch.zeros(1).to(tensor_1.device)
             tensor_1, tensor_2 = tensor_1.unsqueeze(-1), tensor_2.unsqueeze(-1)
             """cul distance matrix"""
             a_, b_ = torch.matmul(tensor_1, tensor_1.t()) * 2, \
@@ -191,7 +194,7 @@ class GraphConv(nn.Module):
         user_res_emb = user_emb  # [n_users, channel]
         cor = self._cul_cor()
         for i in range(len(self.convs)):
-            entity_emb, user_emb = self.convs[i](entity_emb, user_emb, latent_emb,
+            entity_emb, user_emb, score1 = self.convs[i](entity_emb, user_emb, latent_emb,
                                                  edge_index, edge_type, interact_mat,
                                                  self.weight, self.disen_weight_att)
 
@@ -205,6 +208,23 @@ class GraphConv(nn.Module):
             """result emb"""
             entity_res_emb = torch.add(entity_res_emb, entity_emb)
             user_res_emb = torch.add(user_res_emb, user_emb)
+
+            """ draw user group """
+            n_users = user_res_emb.shape[0]
+            num = range(0, n_users)
+            user_list_batch = random.sample(num, n_users)
+            user_batch = torch.LongTensor(np.array(user_list_batch))
+            u_g_embeddings = user_res_emb[user_batch]
+            u_g_embeddings = u_g_embeddings.data.cpu().numpy()
+            score2 = score1[user_batch]
+            score2 = score2.data.cpu().numpy()
+            ts = TSNE(n_components=2, init='pca', random_state=0)
+            # t-SNE降维
+            user_emb_reduce = ts.fit_transform(u_g_embeddings)
+            clr = ['b', 'c', 'r', 'k']
+            for i in range(0, n_users):
+                plt.scatter(user_emb_reduce[i][0], user_emb_reduce[i][1], c=clr[np.argmax(score2[i])], s=1)
+            plt.show()
 
         return entity_res_emb, user_res_emb, cor
 
@@ -231,7 +251,6 @@ class Recommender(nn.Module):
         self.ind = args_config.ind
         self.device = torch.device("cuda:" + str(args_config.gpu_id)) if args_config.cuda \
                                                                       else torch.device("cpu")
-        # self.device = torch.device("cpu")
 
         self.adj_mat = adj_mat
         self.graph = graph
@@ -249,8 +268,7 @@ class Recommender(nn.Module):
         self.latent_emb = initializer(torch.empty(self.n_factors, self.emb_size))
 
         # [n_users, n_entities]
-        # self.interact_mat = self._convert_sp_mat_to_sp_tensor(self.adj_mat).to(self.device)
-        self.interact_mat = self._convert_sp_mat_to_sp_tensor(self.adj_mat).cpu()
+        self.interact_mat = self._convert_sp_mat_to_sp_tensor(self.adj_mat).to(self.device)
 
     def _init_model(self):
         return GraphConv(channel=self.emb_size,
@@ -277,8 +295,7 @@ class Recommender(nn.Module):
         graph_tensor = torch.tensor(list(graph.edges))  # [-1, 3]
         index = graph_tensor[:, :-1]  # [-1, 2]
         type = graph_tensor[:, -1]  # [-1, 1]
-        # return index.t().long().to(self.device), type.long().to(self.device)
-        return index.t().long().cpu(), type.long().cpu()
+        return index.t().long().to(self.device), type.long().to(self.device)
 
     def forward(self, batch=None):
         user = batch['users']

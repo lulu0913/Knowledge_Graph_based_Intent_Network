@@ -5,15 +5,15 @@ def parse_args():
     parser = argparse.ArgumentParser(description="KGIN")
 
     # ===== dataset ===== #
-    parser.add_argument("--dataset", nargs="?", default="alibaba-fashion", help="Choose a dataset:[last-fm,amazon-book,alibaba]")
+    parser.add_argument("--dataset", nargs="?", default="last-fm", help="Choose a dataset:[last-fm,amazon-book,alibaba]")
     parser.add_argument(
         "--data_path", nargs="?", default="data/", help="Input data path."
     )
 
     # ===== train ===== #
     parser.add_argument('--epoch', type=int, default=1000, help='number of epochs')
-    parser.add_argument('--batch_size', type=int, default=4, help='batch size')
-    parser.add_argument('--test_batch_size', type=int, default=4, help='batch size')
+    parser.add_argument('--batch_size', type=int, default=1024, help='batch size')
+    parser.add_argument('--test_batch_size', type=int, default=1024, help='batch size')
     parser.add_argument('--dim', type=int, default=64, help='embedding size')
     parser.add_argument('--l2', type=float, default=1e-5, help='l2 regularization weight')
     parser.add_argument('--lr', type=float, default=1e-4, help='learning rate')
@@ -25,7 +25,7 @@ def parse_args():
     parser.add_argument("--mess_dropout_rate", type=float, default=0.1, help="ratio of node dropout")
     parser.add_argument("--batch_test_flag", type=bool, default=True, help="use gpu or not")
     parser.add_argument("--channel", type=int, default=64, help="hidden channels for model")
-    parser.add_argument("--cuda", type=bool, default=False, help="use gpu or not")
+    parser.add_argument("--cuda", type=bool, default=True, help="use gpu or not")
     parser.add_argument("--gpu_id", type=int, default=0, help="gpu id")
     parser.add_argument('--Ks', nargs='?', default='[20, 40, 60, 80, 100]', help='Output sizes of every layer')
     parser.add_argument('--test_flag', nargs='?', default='part',

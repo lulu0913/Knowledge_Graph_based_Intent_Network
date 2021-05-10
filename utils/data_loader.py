@@ -17,7 +17,7 @@ n_nodes = 0
 train_user_set = defaultdict(list)
 test_user_set = defaultdict(list)
 
-# 读取用户-物品对
+
 def read_cf(file_name):
     inter_mat = list()
     lines = open(file_name, "r").readlines()
@@ -142,8 +142,8 @@ def load_data(model_args):
     directory = args.data_path + args.dataset + '/'
 
     print('reading train and test user-item set ...')
-    train_cf = read_cf(directory + 'train_mini.txt')
-    test_cf = read_cf(directory + 'test_mini.txt')
+    train_cf = read_cf(directory + 'train.txt')
+    test_cf = read_cf(directory + 'test.txt')
     remap_item(train_cf, test_cf)
 
     print('combinating train_cf and kg data ...')

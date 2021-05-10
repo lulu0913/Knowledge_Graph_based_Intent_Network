@@ -1,11 +1,16 @@
 from .metrics import *
 from .parser import parse_args
+from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
 
 import torch
 import numpy as np
 import multiprocessing
 import heapq
 from time import time
+import random
+import matplotlib.pyplot as plt
+
 
 cores = multiprocessing.cpu_count() // 2
 
@@ -14,6 +19,7 @@ Ks = eval(args.Ks)
 device = torch.device("cuda:" + str(args.gpu_id)) if args.cuda else torch.device("cpu")
 BATCH_SIZE = args.test_batch_size
 batch_test_flag = args.batch_test_flag
+
 
 def ranklist_by_heapq(user_pos_test, test_items, rating, Ks):
     item_score = {}
@@ -78,7 +84,6 @@ def get_performance(user_pos_test, r, auc, Ks):
 
 
 def test_one_user(x, train_user_set, test_user_set):
-    # user u's ratings for user u
     res = []
     for item in x:
         rating = item[0]
@@ -96,15 +101,16 @@ def test_one_user(x, train_user_set, test_user_set):
             r, auc = ranklist_by_sorted(user_pos_test, test_items, rating, Ks)
         res.append(get_performance(user_pos_test, r, auc, Ks))
     return res
+    # user u's ratings for user u
     # rating = x[0]
-    # # uid
+    # uid
     # u = x[1]
-    # # user u's items in the training set
+    # user u's items in the training set
     # try:
     #     training_items = train_user_set[u]
     # except Exception:
     #     training_items = []
-    # # user u's items in the test set
+    # user u's items in the test set
     # user_pos_test = test_user_set[u]
     #
     # all_items = set(range(0, n_items))
@@ -146,51 +152,74 @@ def test(model, user_dict, n_params):
     count = 0
 
     entity_gcn_emb, user_gcn_emb = model.generate()
+    factor_emb = model.state_dict()["latent_emb"]
+    num = range(0, n_users)
+    user_list_batch = random.sample(num, 200)
+    user_batch = torch.LongTensor(np.array(user_list_batch))
+    u_g_embeddings = user_gcn_emb[user_batch]
+    u_g_embeddings = u_g_embeddings.data.cpu().numpy()
+    factor_emb = factor_emb.data.cpu().numpy()
+    pca = PCA(n_components=2)
+    ts = TSNE(n_components=2, init='pca', random_state=0)
 
-    for u_batch_id in range(n_user_batchs):
-        start = u_batch_id * u_batch_size
-        end = (u_batch_id + 1) * u_batch_size
+    reduced = pca.fit_transform(u_g_embeddings)
+    factor_emb_reduced = pca.fit_transform(factor_emb)
 
-        user_list_batch = test_users[start: end]
-        user_batch = torch.LongTensor(np.array(user_list_batch)).to(device)
-        u_g_embeddings = user_gcn_emb[user_batch]
+    # We need a 2 x n array, not n by 2 (all X coordinates in one list)
 
-        if batch_test_flag:
-            # batch-item test
-            n_item_batchs = n_items // i_batch_size + 1
-            rate_batch = np.zeros(shape=(len(user_batch), n_items))
+    t = reduced.transpose()
+    s = factor_emb_reduced.transpose()
 
-            i_count = 0
-            for i_batch_id in range(n_item_batchs):
-                i_start = i_batch_id * i_batch_size
-                i_end = min((i_batch_id + 1) * i_batch_size, n_items)
+    plt.scatter(t[0], t[1])
+    plt.scatter(s[0], s[1])
 
-                item_batch = torch.LongTensor(np.array(range(i_start, i_end))).view(i_end-i_start).to(device)
-                i_g_embddings = entity_gcn_emb[item_batch]
+    plt.show()
 
-                i_rate_batch = model.rating(u_g_embeddings, i_g_embddings).detach().cpu()
+    # for u_batch_id in range(n_user_batchs):
+    #     start = u_batch_id * u_batch_size
+    #     end = (u_batch_id + 1) * u_batch_size
+    #
+    #     user_list_batch = test_users[start: end]
+    #     user_batch = torch.LongTensor(np.array(user_list_batch)).to(device)
+    #     u_g_embeddings = user_gcn_emb[user_batch]
+    #
+    #     if batch_test_flag:
+    #         # batch-item test
+    #         n_item_batchs = n_items // i_batch_size + 1
+    #         rate_batch = np.zeros(shape=(len(user_batch), n_items))
+    #
+    #         i_count = 0
+    #         for i_batch_id in range(n_item_batchs):
+    #             i_start = i_batch_id * i_batch_size
+    #             i_end = min((i_batch_id + 1) * i_batch_size, n_items)
+    #
+    #             item_batch = torch.LongTensor(np.array(range(i_start, i_end))).view(i_end-i_start).to(device)
+    #             i_g_embddings = entity_gcn_emb[item_batch]
+    #
+    #             i_rate_batch = model.rating(u_g_embeddings, i_g_embddings).detach().cpu()
+    #
+    #             rate_batch[:, i_start: i_end] = i_rate_batch
+    #             i_count += i_rate_batch.shape[1]
+    #
+    #         assert i_count == n_items
+    #     else:
+    #         # all-item test
+    #         item_batch = torch.LongTensor(np.array(range(0, n_items))).view(n_items, -1).to(device)
+    #         i_g_embddings = entity_gcn_emb[item_batch]
+    #         rate_batch = model.rating(u_g_embeddings, i_g_embddings).detach().cpu()
+    #
+    #     user_batch_rating_uid = zip(rate_batch, user_list_batch)
+    #     # batch_result = pool.map(test_one_user, user_batch_rating_uid)
+    #     batch_result = test_one_user(user_batch_rating_uid, train_user_set, test_user_set)
+    #     count += len(batch_result)
+    #
+    #     for re in batch_result:
+    #         result['precision'] += re['precision']/n_test_users
+    #         result['recall'] += re['recall']/n_test_users
+    #         result['ndcg'] += re['ndcg']/n_test_users
+    #         result['hit_ratio'] += re['hit_ratio']/n_test_users
+    #         result['auc'] += re['auc']/n_test_users
 
-                rate_batch[:, i_start: i_end] = i_rate_batch
-                i_count += i_rate_batch.shape[1]
-
-            assert i_count == n_items
-        else:
-            # all-item test
-            item_batch = torch.LongTensor(np.array(range(0, n_items))).view(n_items, -1).to(device)
-            i_g_embddings = entity_gcn_emb[item_batch]
-            rate_batch = model.rating(u_g_embeddings, i_g_embddings).detach().cpu()
-
-        user_batch_rating_uid = zip(rate_batch, user_list_batch)
-        batch_result = test_one_user(user_batch_rating_uid, train_user_set, test_user_set)
-        count += len(batch_result)
-
-        for re in batch_result:
-            result['precision'] += re['precision']/n_test_users
-            result['recall'] += re['recall']/n_test_users
-            result['ndcg'] += re['ndcg']/n_test_users
-            result['hit_ratio'] += re['hit_ratio']/n_test_users
-            result['auc'] += re['auc']/n_test_users
-
-    assert count == n_test_users
+    # assert count == n_test_users
     pool.close()
     return result
