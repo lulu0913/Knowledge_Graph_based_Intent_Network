@@ -236,6 +236,9 @@ class Recommender(nn.Module):
         self.all_embed = nn.Parameter(self.all_embed)
         self.latent_emb = nn.Parameter(self.latent_emb)
 
+        self.W_R = nn.Parameter(torch.Tensor(self.n_relations, self.emb_size, self.emb_size))
+        nn.init.xavier_uniform_(self.W_R, gain=nn.init.calculate_gain('relu'))
+
         self.gcn = self._init_model()
 
     def _init_weight(self):
@@ -273,15 +276,15 @@ class Recommender(nn.Module):
         type = graph_tensor[:, -1]  # [-1, 1]
         return index.t().long().to(self.device), type.long().to(self.device)
 
-    def forward(self, batch=None):
-        user = batch['users']
-        pos_item = batch['pos_items']
-        neg_item = batch['neg_items']
-
+    def forward(self, flag, cf_batch, kg_batch=None):
+        user = cf_batch['users']
+        pos_item = cf_batch['pos_items']
+        neg_item = cf_batch['neg_items']
         user_emb = self.all_embed[:self.n_users, :]
         item_emb = self.all_embed[self.n_users:, :]
         # entity_gcn_emb: [n_entity, channel]
         # user_gcn_emb: [n_users, channel]
+
         entity_gcn_emb, user_gcn_emb, cor = self.gcn(user_emb,
                                                      item_emb,
                                                      self.latent_emb,
@@ -292,8 +295,15 @@ class Recommender(nn.Module):
                                                      node_dropout=self.node_dropout)
         u_e = user_gcn_emb[user]
         pos_e, neg_e = entity_gcn_emb[pos_item], entity_gcn_emb[neg_item]
-        kg_loss = calc_kg_loss(h, r, pos_t, neg_t)
-        return self.create_bpr_loss(u_e, pos_e, neg_e, cor, kg_loss)
+        if flag == 'kg':
+            h = kg_batch['h']
+            r = kg_batch['r']
+            pos_t = kg_batch['pos_t']
+            neg_t = kg_batch['neg_t']
+            kg_loss = self.calc_kg_loss(h, r, pos_t, neg_t)
+            return kg_loss
+        else:
+            return self.create_bpr_loss(u_e, pos_e, neg_e, cor)
 
     def generate(self):
         user_emb = self.all_embed[:self.n_users, :]
@@ -323,7 +333,7 @@ class Recommender(nn.Module):
         emb_loss = self.decay * regularizer / batch_size
         cor_loss = self.sim_decay * cor
 
-        return mf_loss + emb_loss + cor_loss, mf_loss + emb_loss, emb_loss, cor, kg_loss
+        return mf_loss + emb_loss + cor_loss, mf_loss + emb_loss, emb_loss, cor
 
     def calc_kg_loss(self, h, r, pos_t, neg_t):
         """
@@ -332,12 +342,15 @@ class Recommender(nn.Module):
         pos_t:  (kg_batch_size)
         neg_t:  (kg_batch_size)
         """
-        r_embed = self.relation_embed(r)                 # (kg_batch_size, relation_dim)
+        # r_embed = self.relation_embed(r)                 # (kg_batch_size, relation_dim)
+        r_embed = self.gcn.weight(r)                 # (kg_batch_size, relation_dim)
         W_r = self.W_R[r]                                # (kg_batch_size, entity_dim, relation_dim)
-
-        h_embed = self.entity_user_embed(h)              # (kg_batch_size, entity_dim)
-        pos_t_embed = self.entity_user_embed(pos_t)      # (kg_batch_size, entity_dim)
-        neg_t_embed = self.entity_user_embed(neg_t)      # (kg_batch_size, entity_dim)
+        h = h + self.n_users
+        pos_t = pos_t + self.n_users
+        neg_t = neg_t + self.n_users
+        h_embed = self.all_embed(h)              # (kg_batch_size, entity_dim)
+        pos_t_embed = self.all_embed(pos_t)      # (kg_batch_size, entity_dim)
+        neg_t_embed = self.all_embed(neg_t)      # (kg_batch_size, entity_dim)
 
         r_mul_h = torch.bmm(h_embed.unsqueeze(1), W_r).squeeze(1)             # (kg_batch_size, relation_dim)
         r_mul_pos_t = torch.bmm(pos_t_embed.unsqueeze(1), W_r).squeeze(1)     # (kg_batch_size, relation_dim)
@@ -351,6 +364,9 @@ class Recommender(nn.Module):
         kg_loss = (-1.0) * F.logsigmoid(neg_score - pos_score)
         kg_loss = torch.mean(kg_loss)
 
-        l2_loss = _L2_loss_mean(r_mul_h) + _L2_loss_mean(r_embed) + _L2_loss_mean(r_mul_pos_t) + _L2_loss_mean(r_mul_neg_t)
+        l2_loss = self._L2_loss_mean(r_mul_h) + self._L2_loss_mean(r_embed) + self._L2_loss_mean(r_mul_pos_t) + self._L2_loss_mean(r_mul_neg_t)
         loss = kg_loss + self.kg_l2loss_lambda * l2_loss
         return loss
+
+    def _L2_loss_mean(self, x):
+        return torch.mean(torch.sum(torch.pow(x, 2), dim=1, keepdim=False) / 2.)

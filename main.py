@@ -128,11 +128,12 @@ if __name__ == '__main__':
         """ train cf """
         loss, s, cor_loss = 0, 0, 0
         train_cf_s = time()
+        flag = 'cf'
         while s + args.batch_size <= len(train_cf):
-            batch = get_feed_dict(train_cf_pairs,
+            cf_batch = get_feed_dict(train_cf_pairs,
                                   s, s + args.batch_size,
                                   user_dict['train_user_set'])
-            batch_loss, mf_loss, _, batch_cor, kg_loss = model(batch)
+            batch_loss, mf_loss, _, batch_cor = model(flag, cf_batch)
 
             mf_loss = mf_loss
             optimizer.zero_grad()
@@ -146,14 +147,15 @@ if __name__ == '__main__':
         train_cf_e = time()
 
         """train KG"""
+        flag = 'kg'
         train_kg_s = time()
         s = 0
         kg_batch_size = 2 * args.batch_size
         while s + kg_batch_size <= len(triplets):
-            batch = get_kg_dict(train_kg_pairs,
+            kg_batch = get_kg_dict(train_kg_pairs,
                                   s, s + kg_batch_size,
                                   relation_dict)
-            batch_loss, _, _, batch_cor, kg_loss = model(batch)
+            batch_loss, kg_loss, _, batch_cor = model(flag, cf_batch, kg_batch)
 
             kg_loss = kg_loss
             optimizer.zero_grad()
