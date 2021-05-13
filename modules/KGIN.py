@@ -292,7 +292,8 @@ class Recommender(nn.Module):
                                                      node_dropout=self.node_dropout)
         u_e = user_gcn_emb[user]
         pos_e, neg_e = entity_gcn_emb[pos_item], entity_gcn_emb[neg_item]
-        return self.create_bpr_loss(u_e, pos_e, neg_e, cor)
+        kg_loss = calc_kg_loss(h, r, pos_t, neg_t)
+        return self.create_bpr_loss(u_e, pos_e, neg_e, cor, kg_loss)
 
     def generate(self):
         user_emb = self.all_embed[:self.n_users, :]
@@ -308,7 +309,7 @@ class Recommender(nn.Module):
     def rating(self, u_g_embeddings, i_g_embeddings):
         return torch.matmul(u_g_embeddings, i_g_embeddings.t())
 
-    def create_bpr_loss(self, users, pos_items, neg_items, cor):
+    def create_bpr_loss(self, users, pos_items, neg_items, cor, kg_loss):
         batch_size = users.shape[0]
         pos_scores = torch.sum(torch.mul(users, pos_items), axis=1)
         neg_scores = torch.sum(torch.mul(users, neg_items), axis=1)
@@ -322,4 +323,34 @@ class Recommender(nn.Module):
         emb_loss = self.decay * regularizer / batch_size
         cor_loss = self.sim_decay * cor
 
-        return mf_loss + emb_loss + cor_loss, mf_loss, emb_loss, cor
+        return mf_loss + emb_loss + cor_loss, mf_loss + emb_loss, emb_loss, cor, kg_loss
+
+    def calc_kg_loss(self, h, r, pos_t, neg_t):
+        """
+        h:      (kg_batch_size)
+        r:      (kg_batch_size)
+        pos_t:  (kg_batch_size)
+        neg_t:  (kg_batch_size)
+        """
+        r_embed = self.relation_embed(r)                 # (kg_batch_size, relation_dim)
+        W_r = self.W_R[r]                                # (kg_batch_size, entity_dim, relation_dim)
+
+        h_embed = self.entity_user_embed(h)              # (kg_batch_size, entity_dim)
+        pos_t_embed = self.entity_user_embed(pos_t)      # (kg_batch_size, entity_dim)
+        neg_t_embed = self.entity_user_embed(neg_t)      # (kg_batch_size, entity_dim)
+
+        r_mul_h = torch.bmm(h_embed.unsqueeze(1), W_r).squeeze(1)             # (kg_batch_size, relation_dim)
+        r_mul_pos_t = torch.bmm(pos_t_embed.unsqueeze(1), W_r).squeeze(1)     # (kg_batch_size, relation_dim)
+        r_mul_neg_t = torch.bmm(neg_t_embed.unsqueeze(1), W_r).squeeze(1)     # (kg_batch_size, relation_dim)
+
+        # Equation (1)
+        pos_score = torch.sum(torch.pow(r_mul_h + r_embed - r_mul_pos_t, 2), dim=1)     # (kg_batch_size)
+        neg_score = torch.sum(torch.pow(r_mul_h + r_embed - r_mul_neg_t, 2), dim=1)     # (kg_batch_size)
+
+        # Equation (2)
+        kg_loss = (-1.0) * F.logsigmoid(neg_score - pos_score)
+        kg_loss = torch.mean(kg_loss)
+
+        l2_loss = _L2_loss_mean(r_mul_h) + _L2_loss_mean(r_embed) + _L2_loss_mean(r_mul_pos_t) + _L2_loss_mean(r_mul_neg_t)
+        loss = kg_loss + self.kg_l2loss_lambda * l2_loss
+        return loss

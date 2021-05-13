@@ -42,9 +42,31 @@ def get_feed_dict(train_entity_pairs, start, end, train_user_set):
     entity_pairs = train_entity_pairs[start:end].to(device)
     feed_dict['users'] = entity_pairs[:, 0]
     feed_dict['pos_items'] = entity_pairs[:, 1]
-    feed_dict['neg_items'] = torch.LongTensor(negative_sampling(entity_pairs,
-                                                                train_user_set)).to(device)
+    feed_dict['neg_items'] = torch.LongTensor(negative_sampling(entity_pairs, train_user_set)).to(device)
     return feed_dict
+
+
+def get_kg_dict(train_kg_pairs, start, end, relation_dict):
+    def negative_sampling(kg_pairs, relation_dict):
+        neg_ts = []
+        for h, r , _ in kg_pairs.cpu().numpy():
+            r = int(r)
+            h = int(h)
+            while True:
+                neg_t = np.random.randint(low=0, high=n_entities, size=1)[0]
+                if (h, neg_t) not in relation_dict[r]:
+                    break
+            neg_ts.append(neg_t)
+        return neg_ts
+
+    kg_dict = {}
+    kg_pairs = train_kg_pairs[start:end].to(device)
+    kg_dict['h'] = kg_pairs[:, 0]
+    kg_dict['r'] = kg_pairs[:, 1]
+    kg_dict['pos_t'] = kg_pairs[:, 2]
+    kg_dict['neg_t'] = torch.LongTensor(negative_sampling(kg_pairs, relation_dict)).to(device)
+    return kg_dict
+
 
 
 if __name__ == '__main__':
@@ -63,7 +85,7 @@ if __name__ == '__main__':
     device = torch.device("cuda:"+str(args.gpu_id)) if args.cuda else torch.device("cpu")
 
     """build dataset"""
-    train_cf, test_cf, user_dict, n_params, graph, mat_list = load_data(args)
+    train_cf, test_cf, user_dict, n_params, graph, triplets, relation_dict, mat_list = load_data(args)
     adj_mat_list, norm_mat_list, mean_mat_list = mat_list
 
     n_users = n_params['n_users']
@@ -75,6 +97,9 @@ if __name__ == '__main__':
     """cf data"""
     train_cf_pairs = torch.LongTensor(np.array([[cf[0], cf[1]] for cf in train_cf], np.int32))
     test_cf_pairs = torch.LongTensor(np.array([[cf[0], cf[1]] for cf in test_cf], np.int32))
+
+    """kg data"""
+    train_kg_pairs = torch.LongTensor(np.array([[kg[0], kg[1], kg[2]] for kg in triplets], np.int32))
 
     """define model"""
     model = Recommender(n_params, args, graph, mean_mat_list[0]).to(device)
@@ -94,75 +119,53 @@ if __name__ == '__main__':
         np.random.shuffle(index)
         train_cf_pairs = train_cf_pairs[index]
 
-        """training"""
+        # shuffle kg data
+        index_kg = np.arange(len(triplets))
+        np.random.shuffle(index_kg)
+        train_kg_pairs = train_kg_pairs[index_kg]
+
+        """ training """
+        """ train cf """
         loss, s, cor_loss = 0, 0, 0
-        train_s_t = time()
+        train_cf_s = time()
         while s + args.batch_size <= len(train_cf):
             batch = get_feed_dict(train_cf_pairs,
                                   s, s + args.batch_size,
                                   user_dict['train_user_set'])
-            batch_loss, _, _, batch_cor = model(batch)
+            batch_loss, mf_loss, _, batch_cor, kg_loss = model(batch)
 
-            batch_loss = batch_loss
+            mf_loss = mf_loss
             optimizer.zero_grad()
-            batch_loss.backward()
+            mf_loss.backward()
             optimizer.step()
 
             loss += batch_loss
             cor_loss += batch_cor
             s += args.batch_size
 
-        train_e_t = time()
+        train_cf_e = time()
 
-        time1 = time()
-        cf_total_loss = 0
-        n_cf_batch = data.n_cf_train // data.cf_batch_size + 1
+        """train KG"""
+        train_kg_s = time()
+        s = 0
+        kg_batch_size = 2 * args.batch_size
+        while s + kg_batch_size <= len(triplets):
+            batch = get_kg_dict(train_kg_pairs,
+                                  s, s + kg_batch_size,
+                                  relation_dict)
+            batch_loss, _, _, batch_cor, kg_loss = model(batch)
 
-        for iter in range(1, n_cf_batch + 1):
-            time2 = time()
-            cf_batch_user, cf_batch_pos_item, cf_batch_neg_item = data.generate_cf_batch(data.train_user_dict)
-            if use_cuda:
-                cf_batch_user = cf_batch_user.to(device)
-                cf_batch_pos_item = cf_batch_pos_item.to(device)
-                cf_batch_neg_item = cf_batch_neg_item.to(device)
-            cf_batch_loss = model('calc_cf_loss', train_graph, cf_batch_user, cf_batch_pos_item, cf_batch_neg_item)
-
-            cf_batch_loss.backward()
-            optimizer.step()
+            kg_loss = kg_loss
             optimizer.zero_grad()
-            cf_total_loss += cf_batch_loss.item()
-
-            if (iter % args.cf_print_every) == 0:
-                logging.info(
-                    'CF Training: Epoch {:04d} Iter {:04d} / {:04d} | Time {:.1f}s | Iter Loss {:.4f} | Iter Mean Loss {:.4f}'.format(
-                        epoch, iter, n_cf_batch, time() - time2, cf_batch_loss.item(), cf_total_loss / iter))
-        logging.info(
-            'CF Training: Epoch {:04d} Total Iter {:04d} | Total Time {:.1f}s | Iter Mean Loss {:.4f}'.format(epoch,
-                                                                                                              n_cf_batch,
-                                                                                                              time() - time1,
-                                                                                                              cf_total_loss / n_cf_batch))
-
-        # train kg
-        time1 = time()
-        kg_total_loss = 0
-        n_kg_batch = data.n_kg_train // data.kg_batch_size + 1
-
-        for iter in range(1, n_kg_batch + 1):
-            time2 = time()
-            kg_batch_head, kg_batch_relation, kg_batch_pos_tail, kg_batch_neg_tail = data.generate_kg_batch(
-                data.train_kg_dict)
-            if use_cuda:
-                kg_batch_head = kg_batch_head.to(device)
-                kg_batch_relation = kg_batch_relation.to(device)
-                kg_batch_pos_tail = kg_batch_pos_tail.to(device)
-                kg_batch_neg_tail = kg_batch_neg_tail.to(device)
-            kg_batch_loss = model('calc_kg_loss', kg_batch_head, kg_batch_relation, kg_batch_pos_tail,
-                                  kg_batch_neg_tail)
-
-            kg_batch_loss.backward()
+            kg_loss.backward()
             optimizer.step()
-            optimizer.zero_grad()
-            kg_total_loss += kg_batch_loss.item()
+
+            loss += batch_loss
+            cor_loss += batch_cor
+            s += kg_batch_size
+
+        train_kg_e = time()
+
 
         if epoch % 10 == 9 or epoch == 1:
             """testing"""

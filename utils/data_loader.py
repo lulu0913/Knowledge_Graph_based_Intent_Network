@@ -167,6 +167,6 @@ def load_data(model_args):
         'test_user_set': test_user_set
     }
 
-    return train_cf, test_cf, user_dict, n_params, graph, \
+    return train_cf, test_cf, user_dict, n_params, graph, triplets, relation_dict,\
            [adj_mat_list, norm_mat_list, mean_mat_list]
 
