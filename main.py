@@ -114,6 +114,56 @@ if __name__ == '__main__':
 
         train_e_t = time()
 
+        time1 = time()
+        cf_total_loss = 0
+        n_cf_batch = data.n_cf_train // data.cf_batch_size + 1
+
+        for iter in range(1, n_cf_batch + 1):
+            time2 = time()
+            cf_batch_user, cf_batch_pos_item, cf_batch_neg_item = data.generate_cf_batch(data.train_user_dict)
+            if use_cuda:
+                cf_batch_user = cf_batch_user.to(device)
+                cf_batch_pos_item = cf_batch_pos_item.to(device)
+                cf_batch_neg_item = cf_batch_neg_item.to(device)
+            cf_batch_loss = model('calc_cf_loss', train_graph, cf_batch_user, cf_batch_pos_item, cf_batch_neg_item)
+
+            cf_batch_loss.backward()
+            optimizer.step()
+            optimizer.zero_grad()
+            cf_total_loss += cf_batch_loss.item()
+
+            if (iter % args.cf_print_every) == 0:
+                logging.info(
+                    'CF Training: Epoch {:04d} Iter {:04d} / {:04d} | Time {:.1f}s | Iter Loss {:.4f} | Iter Mean Loss {:.4f}'.format(
+                        epoch, iter, n_cf_batch, time() - time2, cf_batch_loss.item(), cf_total_loss / iter))
+        logging.info(
+            'CF Training: Epoch {:04d} Total Iter {:04d} | Total Time {:.1f}s | Iter Mean Loss {:.4f}'.format(epoch,
+                                                                                                              n_cf_batch,
+                                                                                                              time() - time1,
+                                                                                                              cf_total_loss / n_cf_batch))
+
+        # train kg
+        time1 = time()
+        kg_total_loss = 0
+        n_kg_batch = data.n_kg_train // data.kg_batch_size + 1
+
+        for iter in range(1, n_kg_batch + 1):
+            time2 = time()
+            kg_batch_head, kg_batch_relation, kg_batch_pos_tail, kg_batch_neg_tail = data.generate_kg_batch(
+                data.train_kg_dict)
+            if use_cuda:
+                kg_batch_head = kg_batch_head.to(device)
+                kg_batch_relation = kg_batch_relation.to(device)
+                kg_batch_pos_tail = kg_batch_pos_tail.to(device)
+                kg_batch_neg_tail = kg_batch_neg_tail.to(device)
+            kg_batch_loss = model('calc_kg_loss', kg_batch_head, kg_batch_relation, kg_batch_pos_tail,
+                                  kg_batch_neg_tail)
+
+            kg_batch_loss.backward()
+            optimizer.step()
+            optimizer.zero_grad()
+            kg_total_loss += kg_batch_loss.item()
+
         if epoch % 10 == 9 or epoch == 1:
             """testing"""
             test_s_t = time()
