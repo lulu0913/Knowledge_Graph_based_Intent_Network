@@ -96,28 +96,6 @@ def test_one_user(x, train_user_set, test_user_set):
             r, auc = ranklist_by_sorted(user_pos_test, test_items, rating, Ks)
         res.append(get_performance(user_pos_test, r, auc, Ks))
     return res
-    # rating = x[0]
-    # # uid
-    # u = x[1]
-    # # user u's items in the training set
-    # try:
-    #     training_items = train_user_set[u]
-    # except Exception:
-    #     training_items = []
-    # # user u's items in the test set
-    # user_pos_test = test_user_set[u]
-    #
-    # all_items = set(range(0, n_items))
-    #
-    # test_items = list(all_items - set(training_items))
-    #
-    # if args.test_flag == 'part':
-    #     r, auc = ranklist_by_heapq(user_pos_test, test_items, rating, Ks)
-    # else:
-    #     r, auc = ranklist_by_sorted(user_pos_test, test_items, rating, Ks)
-    #
-    # return get_performance(user_pos_test, r, auc, Ks)
-
 
 def test(model, user_dict, n_params):
     result = {'precision': np.zeros(len(Ks)),

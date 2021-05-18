@@ -17,6 +17,7 @@ from utils.data_loader import load_data
 from modules.KGIN import Recommender
 from utils.evaluate import test
 from utils.helper import early_stopping
+import pickle
 
 n_users = 0
 n_items = 0
@@ -24,6 +25,17 @@ n_entities = 0
 n_nodes = 0
 n_relations = 0
 
+def save_variable(v, filename):
+    f = open(filename, 'wb')
+    pickle.dump(v, f)
+    f.close()
+    return filename
+
+def load_variavle(filename):
+    f = open(filename, 'rb')
+    r = pickle.load(f)
+    f.close()
+    return r
 
 def get_feed_dict(train_entity_pairs, start, end, train_user_set):
 
@@ -87,66 +99,64 @@ if __name__ == '__main__':
     stopping_step = 0
     should_stop = False
 
-    print("start training ...")
-    for epoch in range(args.epoch):
-        """training CF"""
+    recall, ndcg, precision, hit_ratio = [], [], [], []
+    for epoch in range(520):
+        # """training CF"""
         # shuffle training data
-        index = np.arange(len(train_cf))
-        np.random.shuffle(index)
-        train_cf_pairs = train_cf_pairs[index]
+        # index = np.arange(len(train_cf))
+        # np.random.shuffle(index)
+        # train_cf_pairs = train_cf_pairs[index]
+        #
+        # """training"""
+        # loss, s, cor_loss = 0, 0, 0
+        # train_s_t = time()
+        # while s + args.batch_size <= len(train_cf):
+        #     batch = get_feed_dict(train_cf_pairs,
+        #                           s, s + args.batch_size,
+        #                           user_dict['train_user_set'])
+        #     batch_loss, _, _, batch_cor = model(batch)
+        #
+        #     batch_loss = batch_loss
+        #     optimizer.zero_grad()
+        #     batch_loss.backward()
+        #     optimizer.step()
+        #
+        #     loss += batch_loss
+        #     cor_loss += batch_cor
+        #     s += args.batch_size
+        #
+        # train_e_t = time()
 
-        """training"""
-        loss, s, cor_loss = 0, 0, 0
-        train_s_t = time()
-        while s + args.batch_size <= len(train_cf):
-            batch = get_feed_dict(train_cf_pairs,
-                                  s, s + args.batch_size,
-                                  user_dict['train_user_set'])
-            batch_loss, _, _, batch_cor = model(batch)
-
-            batch_loss = batch_loss
-            optimizer.zero_grad()
-            batch_loss.backward()
-            optimizer.step()
-
-            loss += batch_loss
-            cor_loss += batch_cor
-            s += args.batch_size
-
-        train_e_t = time()
-
-        if epoch % 10 == 9 or epoch == 0:
+        if epoch % 10 == 9 or epoch == 1:
             """testing"""
-            state_model = {'net': model.state_dict(), 'optimizer': optimizer.state_dict(), 'epoch': epoch}
-            torch.save(state_model, os.path.join(os.getcwd(), "result", 'epoch-' + str(epoch) + '.model'))
-            if 1:
-                break
+            # state_model = {'net': model.state_dict(), 'optimizer': optimizer.state_dict(), 'epoch': epoch}
+            # torch.save(state_model, os.path.join(os.getcwd(), "result", 'epoch-' + str(epoch) + '.model'))
+            load_dir = os.path.join(os.getcwd(), "result", 'last-fm' + 'epoch-' + str(epoch) + '.model')
+            # use cpu to load model
+            last_model = torch.load(load_dir, map_location='cpu')
+            # use gpu to load model
+            # last_model = torch.load(load_dir)
+            model.load_state_dict(last_model['model_state_dict'])
+            optimizer.load_state_dict(last_model['optimizer_state_dict'])
 
             test_s_t = time()
             ret = test(model, user_dict, n_params)
             test_e_t = time()
 
+            recall.append(ret['recall'])
+            ndcg.append(ret['ndcg'])
+            precision.append(ret['precision'])
+            hit_ratio.append(ret['hit_ratio'])
+
             train_res = PrettyTable()
-            train_res.field_names = ["Epoch", "training time", "tesing time", "Loss", "recall", "ndcg", "precision", "hit_ratio"]
+            train_res.field_names = ["Epoch", "tesing time", "recall", "ndcg", "precision", "hit_ratio"]
             train_res.add_row(
-                [epoch, train_e_t - train_s_t, test_e_t - test_s_t, loss.item(), ret['recall'], ret['ndcg'], ret['precision'], ret['hit_ratio']]
+                [epoch, test_e_t - test_s_t, ret['recall'], ret['ndcg'], ret['precision'], ret['hit_ratio']]
             )
             print(train_res)
-
-            # *********************************************************
-            # early stopping when cur_best_pre_0 is decreasing for ten successive steps.
-            cur_best_pre_0, stopping_step, should_stop = early_stopping(ret['recall'][0], cur_best_pre_0,
-                                                                        stopping_step, expected_order='acc',
-                                                                        flag_step=10)
-            if should_stop:
-                break
-
-            """save weight"""
-            if ret['recall'][0] == cur_best_pre_0 and args.save:
-                torch.save(model.state_dict(), args.out_dir + 'model_' + args.dataset + '.ckpt')
-
-        else:
-            # logging.info('training loss at epoch %d: %f' % (epoch, loss.item()))
-            print('using time %.4f, training loss at epoch %d: %.4f, cor: %.6f' % (train_e_t - train_s_t, epoch, loss.item(), cor_loss.item()))
-
-    print('early stopping at %d, recall@20:%.4f' % (epoch, cur_best_pre_0))
+    recall = save_variable(recall, 'recall.txt')
+    ndcg = save_variable(ndcg, 'ndcg.txt')
+    precision = save_variable(precision, 'precision.txt')
+    hit_ratio = save_variable(hit_ratio, 'hit_ratio.txt')
+    # results = load_variavle('results.txt')
+    print("\n The end")
