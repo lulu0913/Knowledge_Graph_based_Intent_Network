@@ -2,9 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="6b53567a-e914-4607-87fd-3584cbe963db" name="默认变更列表" comment="">
+      <change afterPath="$PROJECT_DIR$/draw.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/modules/KGIN.py" beforeDir="false" afterPath="$PROJECT_DIR$/modules/KGIN.py" afterDir="false" />
     </list>
     <list id="c99bee2f-9af0-4e09-9169-29eca5db3e87" name="fix the global data type bug" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -28,6 +27,11 @@
   <component name="PropertiesComponent">
     <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
     <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
+  </component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="C:\Users\10293\Desktop\Knowledge_Graph_based_Intent_Network" />
+    </key>
   </component>
   <component name="RunManager">
     <configuration name="draw" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
