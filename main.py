@@ -100,7 +100,7 @@ if __name__ == '__main__':
     should_stop = False
 
     recall, ndcg, precision, hit_ratio = [], [], [], []
-    for epoch in range(520):
+    for epoch in range(210):
         # """training CF"""
         # shuffle training data
         # index = np.arange(len(train_cf))
