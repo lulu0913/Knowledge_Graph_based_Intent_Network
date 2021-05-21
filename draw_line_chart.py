@@ -14,30 +14,7 @@ def load_variavle(filename):
     f.close()
     return r
 
-recall_alibaba, ndcg_alibaba, precision_alibaba, hit_ratio_alibaba = [], [], [], []
 # recall_fm, ndcg_fm, precision_fm, hit_ratio_fm = [], [], [], []
-flag = 0
-f = open("./training_log/Alibaba-iFashion.txt", "r", encoding='UTF-8')
-line = f.readline()
-while line:
-    line = f.readline()
-    if line != '' and line[0] == '|':
-        flag += 1
-        flag = flag % 2
-        if flag == 0:
-            # print('yes\t', line)
-            line_res = line.split('|')
-            recall_res = line_res[5][2:-2].split(' ')
-            ndcg_res = line_res[6][2:-2].split(' ')
-            precision_res = line_res[7][2:-2].split(' ')
-            hit_ratio_res = line_res[8][2:-2].split(' ')
-
-            recall_alibaba.append(float(recall_res[0]))
-            ndcg_alibaba.append(float(ndcg_res[0]))
-            precision_alibaba.append(float(precision_res[0]))
-            hit_ratio_alibaba.append(float(hit_ratio_res[0]))
-
-f.close()
 
 recall_fm = load_variavle('recall.txt')
 ndcg_fm = load_variavle('ndcg.txt')
@@ -49,25 +26,48 @@ ndcg_fm = [i.tolist() for i in ndcg_fm]
 precision_fm = [i.tolist() for i in precision_fm]
 hit_ratio_fm = [i.tolist() for i in hit_ratio_fm]
 
-recall_fm = [i[0] for i in recall_fm]
-ndcg_fm = [i[0] for i in ndcg_fm]
-precision_fm = [i[0] for i in precision_fm]
-hit_ratio_fm = [i[0] for i in hit_ratio_fm]
+# recall_fm = [i[0] for i in recall_fm]
+# ndcg_fm = [i[0] for i in ndcg_fm]
+# precision_fm = [i[0] for i in precision_fm]
+# hit_ratio_fm = [i[0] for i in hit_ratio_fm]
+
+res_20 = [recall_fm[21][0], ndcg_fm[21][0], precision_fm[21][0], hit_ratio_fm[21][0]]
+res_40 = [recall_fm[21][1], ndcg_fm[21][1], precision_fm[21][1], hit_ratio_fm[21][1]]
+res_60 = [recall_fm[21][2], ndcg_fm[21][2], precision_fm[21][2], hit_ratio_fm[21][2]]
+res_80 = [recall_fm[21][3], ndcg_fm[21][3], precision_fm[21][3], hit_ratio_fm[21][3]]
+res_100 = [recall_fm[21][4], ndcg_fm[21][4], precision_fm[21][4], hit_ratio_fm[21][4]]
 
 x1 = [1]
 x2 = [10*i+9 for i in range(21)]
 x = x1 + x2
 
+index = ('recall', 'NDCG', 'precision', 'hit_ratio')
+
 plt.rcParams['font.sans-serif'] = ['SimHei']  # 显示汉字
+plt.rcParams['axes.unicode_minus'] = False
 plt.title('precision随训练次数的变化')  # 折线图标题
 
-plt.xlabel('epochs')  # x轴标题
-plt.ylabel('precision')  # y轴标题
+plt.xlabel('评价指标')  # x轴标题
+# plt.ylabel('precision')  # y轴标题
 
-plt.plot(x, precision_alibaba, label='Alibaba-iFashion')
-plt.plot(x, precision_fm, label='Last-FM')
-plt.legend()
-# plt.legend(['方案一', '方案二', '方案三', '方案四'])  # 设置折线名称
+bar_width = 0.18  # 条形宽度
+index_20 = np.arange(len(index))  # 男生条形图的横坐标
+index_40 = index_20 + bar_width  # 女生条形图的横坐标
+index_60 = index_40 + bar_width  # 女生条形图的横坐标
+index_80 = index_60 + bar_width  # 女生条形图的横坐标
+index_100 = index_80 + bar_width  # 女生条形图的横坐标
 
-plt.show()  # 显示折线图
+# 使用两次 bar 函数画出两组条形图
+plt.bar(index_20, height=res_20, width=bar_width, color='r', label='top-20')
+plt.bar(index_40, height=res_40, width=bar_width, color='g', label='top-40')
+plt.bar(index_60, height=res_60, width=bar_width, color='b', label='top-60')
+plt.bar(index_80, height=res_80, width=bar_width, color='c', label='top-80')
+plt.bar(index_100, height=res_100, width=bar_width, color='y', label='top-100')
+
+plt.legend()  # 显示图例
+plt.xticks(index_20 + bar_width*4 / 2, index)  # 让横坐标轴刻度显示 models 里的算法名称， index_recall + bar_width/2 为横坐标轴刻度的位置
+# plt.ylabel('购买量')  # 纵坐标轴标题
+plt.title('列表长度对评价指标的影响')  # 图形标题
+
+plt.show()
 
