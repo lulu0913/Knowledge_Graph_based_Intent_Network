@@ -49,7 +49,7 @@ def get_feed_dict(train_entity_pairs, start, end, train_user_set):
 def get_kg_dict(train_kg_pairs, start, end, relation_dict):
     def negative_sampling(kg_pairs, relation_dict):
         neg_ts = []
-        for h, r , _ in kg_pairs.cpu().numpy():
+        for h, r, _ in kg_pairs.cpu().numpy():
             r = int(r)
             h = int(h)
             while True:
@@ -135,7 +135,6 @@ if __name__ == '__main__':
                                   user_dict['train_user_set'])
             batch_loss, mf_loss, _, batch_cor = model(flag, cf_batch)
 
-            mf_loss = mf_loss
             optimizer.zero_grad()
             mf_loss.backward()
             optimizer.step()
@@ -155,19 +154,17 @@ if __name__ == '__main__':
             kg_batch = get_kg_dict(train_kg_pairs,
                                   s, s + kg_batch_size,
                                   relation_dict)
-            batch_loss, kg_loss, _, batch_cor = model(flag, cf_batch, kg_batch)
+            kg_loss = model(flag, cf_batch, kg_batch)
+            print('this is the ', s)
 
-            kg_loss = kg_loss
             optimizer.zero_grad()
             kg_loss.backward()
             optimizer.step()
 
-            loss += batch_loss
-            cor_loss += batch_cor
+            loss += kg_loss
             s += kg_batch_size
 
         train_kg_e = time()
-
 
         if epoch % 10 == 9 or epoch == 1:
             """testing"""
@@ -176,9 +173,9 @@ if __name__ == '__main__':
             test_e_t = time()
 
             train_res = PrettyTable()
-            train_res.field_names = ["Epoch", "training time", "tesing time", "Loss", "recall", "ndcg", "precision", "hit_ratio"]
+            train_res.field_names = ["Epoch", "training cf time", "training kg time", "testing time", "Loss", "recall", "ndcg", "precision", "hit_ratio"]
             train_res.add_row(
-                [epoch, train_e_t - train_s_t, test_e_t - test_s_t, loss.item(), ret['recall'], ret['ndcg'], ret['precision'], ret['hit_ratio']]
+                [epoch, train_cf_e - train_cf_s, train_kg_e - train_kg_s, test_e_t - test_s_t, loss.item(), ret['recall'], ret['ndcg'], ret['precision'], ret['hit_ratio']]
             )
             print(train_res)
 
@@ -196,6 +193,6 @@ if __name__ == '__main__':
 
         else:
             # logging.info('training loss at epoch %d: %f' % (epoch, loss.item()))
-            print('using time %.4f, training loss at epoch %d: %.4f, cor: %.6f' % (train_e_t - train_s_t, epoch, loss.item(), cor_loss.item()))
+            print('using time %.4f, training loss at epoch %d: %.4f, cor: %.6f' % (train_kg_e - train_cf_s, epoch, loss.item(), cor_loss.item()))
 
     print('early stopping at %d, recall@20:%.4f' % (epoch, cur_best_pre_0))

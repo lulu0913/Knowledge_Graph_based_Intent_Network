@@ -217,6 +217,7 @@ class Recommender(nn.Module):
 
         self.decay = args_config.l2
         self.sim_decay = args_config.sim_regularity
+        self.kg_l2loss_lambda = args_config.kg_l2loss_lambda
         self.emb_size = args_config.dim
         self.context_hops = args_config.context_hops
         self.n_factors = args_config.n_factors
@@ -236,7 +237,7 @@ class Recommender(nn.Module):
         self.all_embed = nn.Parameter(self.all_embed)
         self.latent_emb = nn.Parameter(self.latent_emb)
 
-        self.W_R = nn.Parameter(torch.Tensor(self.n_relations, self.emb_size, self.emb_size))
+        self.W_R = nn.Parameter(torch.Tensor(self.n_relations - 1, self.emb_size, self.emb_size))
         nn.init.xavier_uniform_(self.W_R, gain=nn.init.calculate_gain('relu'))
 
         self.gcn = self._init_model()
@@ -300,9 +301,8 @@ class Recommender(nn.Module):
             r = kg_batch['r']
             pos_t = kg_batch['pos_t']
             neg_t = kg_batch['neg_t']
-            kg_loss = self.calc_kg_loss(h, r, pos_t, neg_t)
-            return kg_loss
-        else:
+            return self.calc_kg_loss(h, r, pos_t, neg_t)
+        elif flag == 'cf':
             return self.create_bpr_loss(u_e, pos_e, neg_e, cor)
 
     def generate(self):
@@ -319,7 +319,7 @@ class Recommender(nn.Module):
     def rating(self, u_g_embeddings, i_g_embeddings):
         return torch.matmul(u_g_embeddings, i_g_embeddings.t())
 
-    def create_bpr_loss(self, users, pos_items, neg_items, cor, kg_loss):
+    def create_bpr_loss(self, users, pos_items, neg_items, cor):
         batch_size = users.shape[0]
         pos_scores = torch.sum(torch.mul(users, pos_items), axis=1)
         neg_scores = torch.sum(torch.mul(users, neg_items), axis=1)
@@ -343,14 +343,14 @@ class Recommender(nn.Module):
         neg_t:  (kg_batch_size)
         """
         # r_embed = self.relation_embed(r)                 # (kg_batch_size, relation_dim)
-        r_embed = self.gcn.weight(r)                 # (kg_batch_size, relation_dim)
-        W_r = self.W_R[r]                                # (kg_batch_size, entity_dim, relation_dim)
+        r_embed = self.gcn.weight[r-1]                # (kg_batch_size, relation_dim)
+        W_r = self.W_R[r-1]                                # (kg_batch_size, entity_dim, relation_dim)
         h = h + self.n_users
         pos_t = pos_t + self.n_users
         neg_t = neg_t + self.n_users
-        h_embed = self.all_embed(h)              # (kg_batch_size, entity_dim)
-        pos_t_embed = self.all_embed(pos_t)      # (kg_batch_size, entity_dim)
-        neg_t_embed = self.all_embed(neg_t)      # (kg_batch_size, entity_dim)
+        h_embed = self.all_embed[h]              # (kg_batch_size, entity_dim)
+        pos_t_embed = self.all_embed[pos_t]      # (kg_batch_size, entity_dim)
+        neg_t_embed = self.all_embed[neg_t]      # (kg_batch_size, entity_dim)
 
         r_mul_h = torch.bmm(h_embed.unsqueeze(1), W_r).squeeze(1)             # (kg_batch_size, relation_dim)
         r_mul_pos_t = torch.bmm(pos_t_embed.unsqueeze(1), W_r).squeeze(1)     # (kg_batch_size, relation_dim)
