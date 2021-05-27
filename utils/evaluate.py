@@ -79,6 +79,7 @@ def get_performance(user_pos_test, r, auc, Ks):
 
 
 def test_one_user(x, train_user_set, test_user_set):
+    res = []
     for item in x:
         rating = item[0]
         u = item[1]
@@ -99,7 +100,8 @@ def test_one_user(x, train_user_set, test_user_set):
         else:
             r, auc = ranklist_by_sorted(user_pos_test, test_items, rating, Ks)
 
-    return get_performance(user_pos_test, r, auc, Ks)
+        res.append(get_performance(user_pos_test, r, auc, Ks))
+    return res
 
 
 def test(model, user_dict, n_params):
