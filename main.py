@@ -120,11 +120,6 @@ if __name__ == '__main__':
         np.random.shuffle(index)
         train_cf_pairs = train_cf_pairs[index]
 
-        # shuffle kg data
-        index_kg = np.arange(len(triplets))
-        np.random.shuffle(index_kg)
-        train_kg_pairs = train_kg_pairs[index_kg]
-
         """ training """
         """ train cf """
         mf_loss_total, s, cor_loss = 0, 0, 0
@@ -134,7 +129,7 @@ if __name__ == '__main__':
             cf_batch = get_feed_dict(train_cf_pairs,
                                      s, s + args.batch_size,
                                      user_dict['train_user_set'])
-            batch_loss, mf_loss, _, batch_cor = model(flag, cf_batch)
+            batch_loss, mf_loss, _, batch_cor = model(cf_batch)
 
             optimizer.zero_grad()
             mf_loss.backward()
@@ -146,29 +141,6 @@ if __name__ == '__main__':
 
         train_cf_e = time()
 
-        """train KG"""
-        kg_loss_total = 0
-        flag = 'kg'
-        train_kg_s = time()
-        s = 0
-        kg_batch_size = 2 * args.batch_size
-        while s + kg_batch_size <= len(triplets):
-            kg_batch = get_kg_dict(train_kg_pairs,
-                                   s, s + kg_batch_size,
-                                   relation_dict)
-            kg_loss = model(flag, cf_batch, kg_batch)
-            if s % 16384 == 0:
-                print('this is the ', s)
-
-            optimizer.zero_grad()
-            kg_loss.backward()
-            optimizer.step()
-
-            kg_loss_total += kg_loss.item()
-            s += kg_batch_size
-
-        train_kg_e = time()
-
         # load_dir = os.path.join(os.getcwd(), "result", "alternative_train", 'last_fm-' + 'epoch-0.model')
         # use cpu to load model
         # last_model = torch.load(load_dir, map_location='cpu')
@@ -179,16 +151,16 @@ if __name__ == '__main__':
 
         if epoch % 10 == 9 or epoch == 1:
             state_model = {'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict(), 'epoch': epoch}
-            torch.save(state_model, os.path.join(os.getcwd(), "result", "alternative_train", 'last_fm-epoch-' + str(epoch) + '.model'))
+            torch.save(state_model, os.path.join(os.getcwd(), "result", "disGNN", 'last_fm-epoch-' + str(epoch) + '.model'))
             """testing"""
             test_s_t = time()
             ret = test(model, user_dict, n_params)
             test_e_t = time()
 
             train_res = PrettyTable()
-            train_res.field_names = ["Epoch", "training cf time", "training kg time", "testing time", "kg_loss", "recall", "ndcg", "precision", "hit_ratio"]
+            train_res.field_names = ["Epoch", "training kg time", "testing time", "recall", "ndcg", "precision", "hit_ratio"]
             train_res.add_row(
-                [epoch, train_cf_e - train_cf_s, train_kg_e - train_kg_s, test_e_t - test_s_t, kg_loss_total, ret['recall'], ret['ndcg'], ret['precision'], ret['hit_ratio']]
+                [epoch, train_cf_e - train_cf_s, test_e_t - test_s_t, ret['recall'], ret['ndcg'], ret['precision'], ret['hit_ratio']]
             )
             print(train_res)
 
@@ -206,6 +178,6 @@ if __name__ == '__main__':
 
         else:
             # logging.info('training loss at epoch %d: %f' % (epoch, loss.item()))
-            print('using time %.4f, training loss at epoch %d: %.4f, cor: %.6f' % (train_kg_e - train_cf_s, epoch, mf_loss_total, kg_loss_total))
+            print('using time %.4f, training loss at epoch %d: %.4f, cor: %.6f' % (train_cf_e - train_cf_s, epoch, mf_loss_total, kg_loss_total))
 
     print('early stopping at %d, recall@20:%.4f' % (epoch, cur_best_pre_0))

@@ -47,6 +47,26 @@ class Aggregator(nn.Module):
                                 weight).expand(n_users, n_factors, channel)
         user_agg = user_agg * (disen_weight * score).sum(dim=1) + user_agg  # [n_users, channel]
 
+        """disGNN"""
+        n, m, d = x.size(0), x_nb.size(1), self.dim
+        x = F.normalize(x, dim=1)
+
+        z = x[x_nb - 1].view(n, m, d)
+        u = None
+        for clus_iter in range(self.routing_iter):
+            if u is None:
+                # p = torch.randn(n, m).to(self.device)
+                p = self._cache_zero.expand(n * m, 1).view(n, m)
+            else:
+                p = torch.sum(z * u.view(n, 1, d), dim=2)
+            p = torch.softmax(p, dim=1)
+            u = torch.sum(z * p.view(n, m, 1), dim=1)
+            u += x.view(n, d)
+            if clus_iter < self.routing_iter - 1:
+                squash = torch.norm(u, dim=1) ** 2 / (torch.norm(u, dim=1) ** 2 + 1)
+                u = squash.unsqueeze(1) * F.normalize(u, dim=1)
+                # u = F.normalize(u, dim=1)
+
         return entity_agg, user_agg
 
 
@@ -277,7 +297,7 @@ class Recommender(nn.Module):
         type = graph_tensor[:, -1]  # [-1, 1]
         return index.t().long().to(self.device), type.long().to(self.device)
 
-    def forward(self, flag, cf_batch, kg_batch=None):
+    def forward(self, cf_batch, kg_batch=None):
         user = cf_batch['users']
         pos_item = cf_batch['pos_items']
         neg_item = cf_batch['neg_items']
@@ -296,14 +316,8 @@ class Recommender(nn.Module):
                                                      node_dropout=self.node_dropout)
         u_e = user_gcn_emb[user]
         pos_e, neg_e = entity_gcn_emb[pos_item], entity_gcn_emb[neg_item]
-        if flag == 'kg':
-            h = kg_batch['h']
-            r = kg_batch['r']
-            pos_t = kg_batch['pos_t']
-            neg_t = kg_batch['neg_t']
-            return self.calc_kg_loss(h, r, pos_t, neg_t)
-        elif flag == 'cf':
-            return self.create_bpr_loss(u_e, pos_e, neg_e, cor)
+
+        return self.create_bpr_loss(u_e, pos_e, neg_e, cor)
 
     def generate(self):
         user_emb = self.all_embed[:self.n_users, :]
@@ -334,39 +348,6 @@ class Recommender(nn.Module):
         cor_loss = self.sim_decay * cor
 
         return mf_loss + emb_loss + cor_loss, mf_loss + emb_loss, emb_loss, cor
-
-    def calc_kg_loss(self, h, r, pos_t, neg_t):
-        """
-        h:      (kg_batch_size)
-        r:      (kg_batch_size)
-        pos_t:  (kg_batch_size)
-        neg_t:  (kg_batch_size)
-        """
-        # r_embed = self.relation_embed(r)                 # (kg_batch_size, relation_dim)
-        r_embed = self.gcn.weight[r-1]                # (kg_batch_size, relation_dim)
-        W_r = self.W_R[r-1]                                # (kg_batch_size, entity_dim, relation_dim)
-        h = h + self.n_users
-        pos_t = pos_t + self.n_users
-        neg_t = neg_t + self.n_users
-        h_embed = self.all_embed[h]              # (kg_batch_size, entity_dim)
-        pos_t_embed = self.all_embed[pos_t]      # (kg_batch_size, entity_dim)
-        neg_t_embed = self.all_embed[neg_t]      # (kg_batch_size, entity_dim)
-
-        r_mul_h = torch.bmm(h_embed.unsqueeze(1), W_r).squeeze(1)             # (kg_batch_size, relation_dim)
-        r_mul_pos_t = torch.bmm(pos_t_embed.unsqueeze(1), W_r).squeeze(1)     # (kg_batch_size, relation_dim)
-        r_mul_neg_t = torch.bmm(neg_t_embed.unsqueeze(1), W_r).squeeze(1)     # (kg_batch_size, relation_dim)
-
-        # Equation (1)
-        pos_score = torch.sum(torch.pow(r_mul_h + r_embed - r_mul_pos_t, 2), dim=1)     # (kg_batch_size)
-        neg_score = torch.sum(torch.pow(r_mul_h + r_embed - r_mul_neg_t, 2), dim=1)     # (kg_batch_size)
-
-        # Equation (2)
-        kg_loss = (-1.0) * F.logsigmoid(neg_score - pos_score)
-        kg_loss = torch.mean(kg_loss)
-
-        l2_loss = self._L2_loss_mean(r_mul_h) + self._L2_loss_mean(r_embed) + self._L2_loss_mean(r_mul_pos_t) + self._L2_loss_mean(r_mul_neg_t)
-        loss = kg_loss + self.kg_l2loss_lambda * l2_loss
-        return loss
 
     def _L2_loss_mean(self, x):
         return torch.mean(torch.sum(torch.pow(x, 2), dim=1, keepdim=False) / 2.)
