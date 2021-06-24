@@ -27,7 +27,7 @@ def parse_args():
     parser.add_argument("--mess_dropout_rate", type=float, default=0.1, help="ratio of node dropout")
     parser.add_argument("--batch_test_flag", type=bool, default=True, help="use gpu or not")
     parser.add_argument("--channel", type=int, default=64, help="hidden channels for model")
-    parser.add_argument("--cuda", type=bool, default=True, help="use gpu or not")
+    parser.add_argument("--cuda", type=bool, default=False, help="use gpu or not")
     parser.add_argument("--gpu_id", type=int, default=0, help="gpu id")
     parser.add_argument('--Ks', nargs='?', default='[20, 40, 60, 80, 100]', help='Output sizes of every layer')
     parser.add_argument('--test_flag', nargs='?', default='part',
@@ -37,6 +37,7 @@ def parse_args():
 
     # ===== relation context ===== #
     parser.add_argument('--context_hops', type=int, default=3, help='number of context hops')
+    parser.add_argument('--routing_iter', type=int, default=3, help='number of routing iter')
 
     # ===== save model ===== #
     parser.add_argument("--save", type=bool, default=False, help="save model or not")

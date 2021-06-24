@@ -17,10 +17,11 @@ class Aggregator(nn.Module):
     """
     Relational Path-aware Convolution Network
     """
-    def __init__(self, n_users, n_factors):
+    def __init__(self, n_users, n_factors, routing_iter):
         super(Aggregator, self).__init__()
         self.n_users = n_users
         self.n_factors = n_factors
+        self.routing_iter = routing_iter
 
     def forward(self, entity_emb, user_emb, latent_emb,
                 edge_index, edge_type, interact_mat,
@@ -30,6 +31,37 @@ class Aggregator(nn.Module):
         channel = entity_emb.shape[1]
         n_users = self.n_users
         n_factors = self.n_factors
+
+        edge_type_uni = np.unique(edge_type)
+        for i in edge_type_uni:
+            index = np.where(edge_type == i)
+            index = index[0]
+            head, tail = edge_index
+            head = head[index]
+            tail = tail[index]
+            u = None
+            for clus_iter in range(self.routing_iter):
+                neigh_emb = entity_emb[tail]
+                if u is None:
+                    # p = torch.randn(n, m).to(self.device)
+                    # p = self._cache_zero.expand(n * m, 1).view(n, m)
+                    u = scatter_mean(src=neigh_emb, index=head, dim_size=n_entities, dim=0)
+                else:
+                    center_emb = u[head]
+                    sim = torch.sum(center_emb * neigh_emb, dim=1)
+                    p = torch.ones(n_entities, n_entities)
+                    p[center_emb, neigh_emb] = sim
+                    p = torch.softmax(p, dim=1)
+
+                    p = torch.sum(z * u.view(n, 1, d), dim=2)
+                    p = torch.softmax(p, dim=1)
+                    u = torch.sum(z * p.view(n, m, 1), dim=1)
+                    u += x.view(n, d)
+
+                if clus_iter < self.routing_iter - 1:
+                    squash = torch.norm(u, dim=1) ** 2 / (torch.norm(u, dim=1) ** 2 + 1)
+                    u = squash.unsqueeze(1) * F.normalize(u, dim=1)
+                    # u = F.normalize(u, dim=1)
 
         """KG aggregate"""
         head, tail = edge_index
@@ -74,7 +106,7 @@ class GraphConv(nn.Module):
     """
     Graph Convolutional Network
     """
-    def __init__(self, channel, n_hops, n_users,
+    def __init__(self, channel, n_hops, routing_iter, n_users,
                  n_factors, n_relations, interact_mat,
                  ind, node_dropout_rate=0.5, mess_dropout_rate=0.1):
         super(GraphConv, self).__init__()
@@ -98,7 +130,7 @@ class GraphConv(nn.Module):
         self.disen_weight_att = nn.Parameter(disen_weight_att)
 
         for i in range(n_hops):
-            self.convs.append(Aggregator(n_users=n_users, n_factors=n_factors))
+            self.convs.append(Aggregator(n_users=n_users, n_factors=n_factors, routing_iter=routing_iter))
 
         self.dropout = nn.Dropout(p=mess_dropout_rate)  # mess dropout
 
@@ -240,6 +272,7 @@ class Recommender(nn.Module):
         self.kg_l2loss_lambda = args_config.kg_l2loss_lambda
         self.emb_size = args_config.dim
         self.context_hops = args_config.context_hops
+        self.routing_iter = args_config.routing_iter
         self.n_factors = args_config.n_factors
         self.node_dropout = args_config.node_dropout
         self.node_dropout_rate = args_config.node_dropout_rate
@@ -273,6 +306,7 @@ class Recommender(nn.Module):
     def _init_model(self):
         return GraphConv(channel=self.emb_size,
                          n_hops=self.context_hops,
+                         routing_iter=self.routing_iter,
                          n_users=self.n_users,
                          n_relations=self.n_relations,
                          n_factors=self.n_factors,

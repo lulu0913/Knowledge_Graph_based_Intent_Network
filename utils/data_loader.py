@@ -142,8 +142,8 @@ def load_data(model_args):
     directory = args.data_path + args.dataset + '/'
 
     print('reading train and test user-item set ...')
-    train_cf = read_cf(directory + 'train.txt')
-    test_cf = read_cf(directory + 'test.txt')
+    train_cf = read_cf(directory + 'train_mini.txt')
+    test_cf = read_cf(directory + 'test_mini.txt')
     remap_item(train_cf, test_cf)
 
     print('combinating train_cf and kg data ...')
