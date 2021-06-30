@@ -32,9 +32,9 @@ class Aggregator(nn.Module):
         n_users = self.n_users
         n_factors = self.n_factors
 
-        edge_type_uni = np.unique(edge_type)
+        edge_type_uni = torch.unique(edge_type)
         for i in edge_type_uni:
-            index = np.where(edge_type == i)
+            index = torch.where(edge_type == i)
             index = index[0]
             head, tail = edge_index
             head = head[index]
@@ -49,55 +49,62 @@ class Aggregator(nn.Module):
                 else:
                     center_emb = u[head]
                     sim = torch.sum(center_emb * neigh_emb, dim=1)
-                    p = torch.ones(n_entities, n_entities)
-                    p[center_emb, neigh_emb] = sim
-                    p = torch.softmax(p, dim=1)
+                    n, d = neigh_emb.size()
+                    sim = torch.unsqueeze(sim, dim=1)
+                    sim.expand(n, d)
+                    neigh_emb = sim * neigh_emb
+                    u = scatter_mean(src=neigh_emb, index=head, dim_size=n_entities, dim=0)
 
-                    p = torch.sum(z * u.view(n, 1, d), dim=2)
-                    p = torch.softmax(p, dim=1)
-                    u = torch.sum(z * p.view(n, m, 1), dim=1)
-                    u += x.view(n, d)
+                    # sim = torch.sum(center_emb * neigh_emb, dim=1)
+                    # p = torch.ones(n_entities, n_entities)
+                    # p = p * (-1000)
+                    # p[head, tail] = sim
+                    # p = torch.softmax(p, dim=1)
+                    # u = torch.mm(p, entity_emb)
 
                 if clus_iter < self.routing_iter - 1:
                     squash = torch.norm(u, dim=1) ** 2 / (torch.norm(u, dim=1) ** 2 + 1)
                     u = squash.unsqueeze(1) * F.normalize(u, dim=1)
                     # u = F.normalize(u, dim=1)
+                u += entity_emb
+        entity_agg = u
+        user_agg = torch.sparse.mm(interact_mat, entity_agg)
 
-        """KG aggregate"""
-        head, tail = edge_index
-        edge_relation_emb = weight[edge_type - 1]  # exclude interact, remap [1, n_relations) to [0, n_relations-1)
-        neigh_relation_emb = entity_emb[tail] * edge_relation_emb  # [-1, channel]
-        entity_agg = scatter_mean(src=neigh_relation_emb, index=head, dim_size=n_entities, dim=0)
-
-        """cul user->latent factor attention"""
-        score_ = torch.mm(user_emb, latent_emb.t())
-        score = nn.Softmax(dim=1)(score_).unsqueeze(-1)  # [n_users, n_factors, 1]
-
-        """user aggregate"""
-        user_agg = torch.sparse.mm(interact_mat, entity_emb)  # [n_users, channel]
-        disen_weight = torch.mm(nn.Softmax(dim=-1)(disen_weight_att),
-                                weight).expand(n_users, n_factors, channel)
-        user_agg = user_agg * (disen_weight * score).sum(dim=1) + user_agg  # [n_users, channel]
-
-        """disGNN"""
-        n, m, d = x.size(0), x_nb.size(1), self.dim
-        x = F.normalize(x, dim=1)
-
-        z = x[x_nb - 1].view(n, m, d)
-        u = None
-        for clus_iter in range(self.routing_iter):
-            if u is None:
-                # p = torch.randn(n, m).to(self.device)
-                p = self._cache_zero.expand(n * m, 1).view(n, m)
-            else:
-                p = torch.sum(z * u.view(n, 1, d), dim=2)
-            p = torch.softmax(p, dim=1)
-            u = torch.sum(z * p.view(n, m, 1), dim=1)
-            u += x.view(n, d)
-            if clus_iter < self.routing_iter - 1:
-                squash = torch.norm(u, dim=1) ** 2 / (torch.norm(u, dim=1) ** 2 + 1)
-                u = squash.unsqueeze(1) * F.normalize(u, dim=1)
-                # u = F.normalize(u, dim=1)
+        # """KG aggregate"""
+        # head, tail = edge_index
+        # edge_relation_emb = weight[edge_type - 1]  # exclude interact, remap [1, n_relations) to [0, n_relations-1)
+        # neigh_relation_emb = entity_emb[tail] * edge_relation_emb  # [-1, channel]
+        # entity_agg = scatter_mean(src=neigh_relation_emb, index=head, dim_size=n_entities, dim=0)
+        #
+        # """cul user->latent factor attention"""
+        # score_ = torch.mm(user_emb, latent_emb.t())
+        # score = nn.Softmax(dim=1)(score_).unsqueeze(-1)  # [n_users, n_factors, 1]
+        #
+        # """user aggregate"""
+        # user_agg = torch.sparse.mm(interact_mat, entity_emb)  # [n_users, channel]
+        # disen_weight = torch.mm(nn.Softmax(dim=-1)(disen_weight_att),
+        #                         weight).expand(n_users, n_factors, channel)
+        # user_agg = user_agg * (disen_weight * score).sum(dim=1) + user_agg  # [n_users, channel]
+        #
+        # """disGNN"""
+        # n, m, d = x.size(0), x_nb.size(1), self.dim
+        # x = F.normalize(x, dim=1)
+        #
+        # z = x[x_nb - 1].view(n, m, d)
+        # u = None
+        # for clus_iter in range(self.routing_iter):
+        #     if u is None:
+        #         # p = torch.randn(n, m).to(self.device)
+        #         p = self._cache_zero.expand(n * m, 1).view(n, m)
+        #     else:
+        #         p = torch.sum(z * u.view(n, 1, d), dim=2)
+        #     p = torch.softmax(p, dim=1)
+        #     u = torch.sum(z * p.view(n, m, 1), dim=1)
+        #     u += x.view(n, d)
+        #     if clus_iter < self.routing_iter - 1:
+        #         squash = torch.norm(u, dim=1) ** 2 / (torch.norm(u, dim=1) ** 2 + 1)
+        #         u = squash.unsqueeze(1) * F.normalize(u, dim=1)
+        #         # u = F.normalize(u, dim=1)
 
         return entity_agg, user_agg
 

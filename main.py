@@ -149,7 +149,7 @@ if __name__ == '__main__':
         # model.load_state_dict(last_model['model_state_dict'])
         # optimizer.load_state_dict(last_model['optimizer_state_dict'])
 
-        if epoch % 10 == 9 or epoch == 1:
+        if epoch % 2 == 0 or epoch == 1:
             state_model = {'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict(), 'epoch': epoch}
             torch.save(state_model, os.path.join(os.getcwd(), "result", "disGNN", 'last_fm-epoch-' + str(epoch) + '.model'))
             """testing"""
@@ -178,6 +178,6 @@ if __name__ == '__main__':
 
         else:
             # logging.info('training loss at epoch %d: %f' % (epoch, loss.item()))
-            print('using time %.4f, training loss at epoch %d: %.4f, cor: %.6f' % (train_cf_e - train_cf_s, epoch, mf_loss_total, kg_loss_total))
+            print('using time %.4f, training loss at epoch %d: %.4f' % (train_cf_e - train_cf_s, epoch, mf_loss_total))
 
     print('early stopping at %d, recall@20:%.4f' % (epoch, cur_best_pre_0))
