@@ -47,26 +47,6 @@ class Aggregator(nn.Module):
                                 weight).expand(n_users, n_factors, channel)
         user_agg = user_agg * (disen_weight * score).sum(dim=1) + user_agg  # [n_users, channel]
 
-        """disGNN"""
-        n, m, d = x.size(0), x_nb.size(1), self.dim
-        x = F.normalize(x, dim=1)
-
-        z = x[x_nb - 1].view(n, m, d)
-        u = None
-        for clus_iter in range(self.routing_iter):
-            if u is None:
-                # p = torch.randn(n, m).to(self.device)
-                p = self._cache_zero.expand(n * m, 1).view(n, m)
-            else:
-                p = torch.sum(z * u.view(n, 1, d), dim=2)
-            p = torch.softmax(p, dim=1)
-            u = torch.sum(z * p.view(n, m, 1), dim=1)
-            u += x.view(n, d)
-            if clus_iter < self.routing_iter - 1:
-                squash = torch.norm(u, dim=1) ** 2 / (torch.norm(u, dim=1) ** 2 + 1)
-                u = squash.unsqueeze(1) * F.normalize(u, dim=1)
-                # u = F.normalize(u, dim=1)
-
         return entity_agg, user_agg
 
 

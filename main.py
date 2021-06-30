@@ -151,14 +151,14 @@ if __name__ == '__main__':
 
         if epoch % 10 == 9 or epoch == 1:
             state_model = {'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict(), 'epoch': epoch}
-            torch.save(state_model, os.path.join(os.getcwd(), "result", "disGNN", 'last_fm-epoch-' + str(epoch) + '.model'))
+            torch.save(state_model, os.path.join(os.getcwd(), "result", "KGIN", 'last_fm-epoch-' + str(epoch) + '.model'))
             """testing"""
             test_s_t = time()
             ret = test(model, user_dict, n_params)
             test_e_t = time()
 
             train_res = PrettyTable()
-            train_res.field_names = ["Epoch", "training kg time", "testing time", "recall", "ndcg", "precision", "hit_ratio"]
+            train_res.field_names = ["Epoch", "training time", "testing time", "recall", "ndcg", "precision", "hit_ratio"]
             train_res.add_row(
                 [epoch, train_cf_e - train_cf_s, test_e_t - test_s_t, ret['recall'], ret['ndcg'], ret['precision'], ret['hit_ratio']]
             )
@@ -178,6 +178,6 @@ if __name__ == '__main__':
 
         else:
             # logging.info('training loss at epoch %d: %f' % (epoch, loss.item()))
-            print('using time %.4f, training loss at epoch %d: %.4f, cor: %.6f' % (train_cf_e - train_cf_s, epoch, mf_loss_total, kg_loss_total))
+            print('using time %.4f, training loss at epoch %d: %.4f' % (train_cf_e - train_cf_s, epoch, mf_loss_total))
 
     print('early stopping at %d, recall@20:%.4f' % (epoch, cur_best_pre_0))
