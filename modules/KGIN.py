@@ -23,9 +23,9 @@ class Aggregator(nn.Module):
         self.n_factors = n_factors
         self.routing_iter = routing_iter
 
-    def forward(self, entity_emb, user_emb, latent_emb,
+    def forward(self, entity_emb, user_emb,
                 edge_index, edge_type, interact_mat,
-                weight, disen_weight_att):
+                weight):
 
         n_entities = entity_emb.shape[0]
         channel = entity_emb.shape[1]
@@ -33,6 +33,7 @@ class Aggregator(nn.Module):
         n_factors = self.n_factors
 
         edge_type_uni = torch.unique(edge_type)
+        entity_emb_list = []
         for i in edge_type_uni:
             index = torch.where(edge_type == i)
             index = index[0]
@@ -67,7 +68,8 @@ class Aggregator(nn.Module):
                     u = squash.unsqueeze(1) * F.normalize(u, dim=1)
                     # u = F.normalize(u, dim=1)
                 u += entity_emb
-        entity_agg = u
+            entity_emb_list.append(u)
+        entity_agg = torch.mm(weight, entity_emb_list)
         user_agg = torch.sparse.mm(interact_mat, entity_agg)
 
         # """KG aggregate"""
@@ -130,11 +132,12 @@ class GraphConv(nn.Module):
         self.temperature = 0.2
 
         initializer = nn.init.xavier_uniform_
-        weight = initializer(torch.empty(n_relations - 1, channel))  # not include interact
+        # weight = initializer(torch.empty(n_relations - 1, channel))  # not include interact
+        weight = initializer(torch.empty(1, n_relations - 1))  # not include interact
         self.weight = nn.Parameter(weight)  # [n_relations - 1, in_channel]
 
-        disen_weight_att = initializer(torch.empty(n_factors, n_relations - 1))
-        self.disen_weight_att = nn.Parameter(disen_weight_att)
+        # disen_weight_att = initializer(torch.empty(n_factors, n_relations - 1))
+        # self.disen_weight_att = nn.Parameter(disen_weight_att)
 
         for i in range(n_hops):
             self.convs.append(Aggregator(n_users=n_users, n_factors=n_factors, routing_iter=routing_iter))
@@ -234,7 +237,7 @@ class GraphConv(nn.Module):
                         cor += CosineSimilarity(self.disen_weight_att[i], self.disen_weight_att[j])
         return cor
 
-    def forward(self, user_emb, entity_emb, latent_emb, edge_index, edge_type,
+    def forward(self, user_emb, entity_emb, edge_index, edge_type,
                 interact_mat, mess_dropout=True, node_dropout=False):
 
         """node dropout"""
@@ -244,11 +247,12 @@ class GraphConv(nn.Module):
 
         entity_res_emb = entity_emb  # [n_entity, channel]
         user_res_emb = user_emb  # [n_users, channel]
-        cor = self._cul_cor()
+        # cor = self._cul_cor()
+        cor = 0
         for i in range(len(self.convs)):
-            entity_emb, user_emb = self.convs[i](entity_emb, user_emb, latent_emb,
+            entity_emb, user_emb = self.convs[i](entity_emb, user_emb,
                                                  edge_index, edge_type, interact_mat,
-                                                 self.weight, self.disen_weight_att)
+                                                 self.weight)
 
             """message dropout"""
             if mess_dropout:
@@ -295,17 +299,17 @@ class Recommender(nn.Module):
 
         self._init_weight()
         self.all_embed = nn.Parameter(self.all_embed)
-        self.latent_emb = nn.Parameter(self.latent_emb)
+        # self.latent_emb = nn.Parameter(self.latent_emb)
 
-        self.W_R = nn.Parameter(torch.Tensor(self.n_relations - 1, self.emb_size, self.emb_size))
-        nn.init.xavier_uniform_(self.W_R, gain=nn.init.calculate_gain('relu'))
+        # self.W_R = nn.Parameter(torch.Tensor(self.n_relations - 1, self.emb_size, self.emb_size))
+        # nn.init.xavier_uniform_(self.W_R, gain=nn.init.calculate_gain('relu'))
 
         self.gcn = self._init_model()
 
     def _init_weight(self):
         initializer = nn.init.xavier_uniform_
         self.all_embed = initializer(torch.empty(self.n_nodes, self.emb_size))
-        self.latent_emb = initializer(torch.empty(self.n_factors, self.emb_size))
+        # self.latent_emb = initializer(torch.empty(self.n_factors, self.emb_size))
 
         # [n_users, n_entities]
         self.interact_mat = self._convert_sp_mat_to_sp_tensor(self.adj_mat).to(self.device)
@@ -349,7 +353,6 @@ class Recommender(nn.Module):
 
         entity_gcn_emb, user_gcn_emb, cor = self.gcn(user_emb,
                                                      item_emb,
-                                                     self.latent_emb,
                                                      self.edge_index,
                                                      self.edge_type,
                                                      self.interact_mat,
