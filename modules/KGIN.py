@@ -69,7 +69,11 @@ class Aggregator(nn.Module):
                     # u = F.normalize(u, dim=1)
                 u += entity_emb
             entity_emb_list.append(u)
-        entity_agg = torch.mm(weight, entity_emb_list)
+        entity_emb_list = torch.stack(entity_emb_list, dim=0)
+        weight = weight.unsqueeze(1) #[n_relations-1, 1, 1]
+        a = weight.expand(len(edge_type_uni), n_entities, 1)
+        # entity_agg = torch.mm(weight, entity_emb_list)
+        entity_agg = (entity_emb_list * a).sum(dim=0)
         user_agg = torch.sparse.mm(interact_mat, entity_agg)
 
         # """KG aggregate"""
@@ -133,7 +137,7 @@ class GraphConv(nn.Module):
 
         initializer = nn.init.xavier_uniform_
         # weight = initializer(torch.empty(n_relations - 1, channel))  # not include interact
-        weight = initializer(torch.empty(1, n_relations - 1))  # not include interact
+        weight = initializer(torch.empty(n_relations - 1, 1))  # not include interact
         self.weight = nn.Parameter(weight)  # [n_relations - 1, in_channel]
 
         # disen_weight_att = initializer(torch.empty(n_factors, n_relations - 1))
