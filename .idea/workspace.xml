@@ -20,9 +20,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="6b53567a-e914-4607-87fd-3584cbe963db" name="默认变更列表" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/sonarlint/issuestore/index.pb" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/sonarlint/issuestore/index.pb" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/modules/KGIN.py" beforeDir="false" afterPath="$PROJECT_DIR$/modules/KGIN.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/parser.py" beforeDir="false" afterPath="$PROJECT_DIR$/utils/parser.py" afterDir="false" />
     </list>
     <list id="c99bee2f-9af0-4e09-9169-29eca5db3e87" name="fix the global data type bug" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -136,38 +136,38 @@
     <option name="LAST_COMMIT_MESSAGE" value="fix the global data type bug" />
   </component>
   <component name="WindowStateProjectService">
-    <state width="1877" height="356" key="GridCell.Tab.0.bottom" timestamp="1625147129854">
+    <state width="1877" height="269" key="GridCell.Tab.0.bottom" timestamp="1625448971382">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
-    <state width="1877" height="356" key="GridCell.Tab.0.bottom/0.0.1920.1040@0.0.1920.1040" timestamp="1625147129854" />
-    <state width="1877" height="356" key="GridCell.Tab.0.center" timestamp="1625147129853">
+    <state width="1877" height="269" key="GridCell.Tab.0.bottom/0.0.1920.1040@0.0.1920.1040" timestamp="1625448971382" />
+    <state width="1877" height="269" key="GridCell.Tab.0.center" timestamp="1625448971381">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
-    <state width="1877" height="356" key="GridCell.Tab.0.center/0.0.1920.1040@0.0.1920.1040" timestamp="1625147129853" />
-    <state width="1877" height="356" key="GridCell.Tab.0.left" timestamp="1625147129853">
+    <state width="1877" height="269" key="GridCell.Tab.0.center/0.0.1920.1040@0.0.1920.1040" timestamp="1625448971381" />
+    <state width="1877" height="269" key="GridCell.Tab.0.left" timestamp="1625448971380">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
-    <state width="1877" height="356" key="GridCell.Tab.0.left/0.0.1920.1040@0.0.1920.1040" timestamp="1625147129853" />
-    <state width="1877" height="356" key="GridCell.Tab.0.right" timestamp="1625147129854">
+    <state width="1877" height="269" key="GridCell.Tab.0.left/0.0.1920.1040@0.0.1920.1040" timestamp="1625448971380" />
+    <state width="1877" height="269" key="GridCell.Tab.0.right" timestamp="1625448971382">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
-    <state width="1877" height="356" key="GridCell.Tab.0.right/0.0.1920.1040@0.0.1920.1040" timestamp="1625147129854" />
-    <state width="1877" height="339" key="GridCell.Tab.1.bottom" timestamp="1625146969347">
+    <state width="1877" height="269" key="GridCell.Tab.0.right/0.0.1920.1040@0.0.1920.1040" timestamp="1625448971382" />
+    <state width="1877" height="339" key="GridCell.Tab.1.bottom" timestamp="1625189991008">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
-    <state width="1877" height="339" key="GridCell.Tab.1.bottom/0.0.1920.1040@0.0.1920.1040" timestamp="1625146969347" />
-    <state width="1877" height="339" key="GridCell.Tab.1.center" timestamp="1625146969347">
+    <state width="1877" height="339" key="GridCell.Tab.1.bottom/0.0.1920.1040@0.0.1920.1040" timestamp="1625189991008" />
+    <state width="1877" height="339" key="GridCell.Tab.1.center" timestamp="1625189991008">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
-    <state width="1877" height="339" key="GridCell.Tab.1.center/0.0.1920.1040@0.0.1920.1040" timestamp="1625146969347" />
-    <state width="1877" height="339" key="GridCell.Tab.1.left" timestamp="1625146969347">
+    <state width="1877" height="339" key="GridCell.Tab.1.center/0.0.1920.1040@0.0.1920.1040" timestamp="1625189991008" />
+    <state width="1877" height="339" key="GridCell.Tab.1.left" timestamp="1625189991008">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
-    <state width="1877" height="339" key="GridCell.Tab.1.left/0.0.1920.1040@0.0.1920.1040" timestamp="1625146969347" />
-    <state width="1877" height="339" key="GridCell.Tab.1.right" timestamp="1625146969347">
+    <state width="1877" height="339" key="GridCell.Tab.1.left/0.0.1920.1040@0.0.1920.1040" timestamp="1625189991008" />
+    <state width="1877" height="339" key="GridCell.Tab.1.right" timestamp="1625189991008">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
-    <state width="1877" height="339" key="GridCell.Tab.1.right/0.0.1920.1040@0.0.1920.1040" timestamp="1625146969347" />
+    <state width="1877" height="339" key="GridCell.Tab.1.right/0.0.1920.1040@0.0.1920.1040" timestamp="1625189991008" />
     <state x="461" y="164" key="SettingsEditor" timestamp="1624966249685">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
@@ -176,16 +176,5 @@
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
     <state x="623" y="225" width="672" height="678" key="search.everywhere.popup/0.0.1920.1040@0.0.1920.1040" timestamp="1625145297839" />
-  </component>
-  <component name="XDebuggerManager">
-    <breakpoint-manager>
-      <breakpoints>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/modules/KGIN.py</url>
-          <line>76</line>
-          <option name="timeStamp" value="8" />
-        </line-breakpoint>
-      </breakpoints>
-    </breakpoint-manager>
   </component>
 </project>

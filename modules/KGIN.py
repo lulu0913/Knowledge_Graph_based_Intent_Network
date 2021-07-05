@@ -71,7 +71,7 @@ class Aggregator(nn.Module):
             entity_emb_list.append(u)
         entity_emb_list = torch.stack(entity_emb_list, dim=0)
         weight = weight.unsqueeze(1) #[n_relations-1, 1, 1]
-        a = weight.expand(len(edge_type_uni), n_entities, 1)
+        a = weight
         # entity_agg = torch.mm(weight, entity_emb_list)
         entity_agg = (entity_emb_list * a).sum(dim=0)
         user_agg = torch.sparse.mm(interact_mat, entity_agg)
@@ -372,7 +372,6 @@ class Recommender(nn.Module):
         item_emb = self.all_embed[self.n_users:, :]
         return self.gcn(user_emb,
                         item_emb,
-                        self.latent_emb,
                         self.edge_index,
                         self.edge_type,
                         self.interact_mat,
