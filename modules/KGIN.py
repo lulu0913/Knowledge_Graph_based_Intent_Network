@@ -34,6 +34,7 @@ class Aggregator(nn.Module):
 
         edge_type_uni = torch.unique(edge_type)
         entity_emb_list = []
+        torch_cat = 0
         for i in edge_type_uni:
             index = torch.where(edge_type == i)
             index = index[0]
@@ -68,12 +69,18 @@ class Aggregator(nn.Module):
                     u = squash.unsqueeze(1) * F.normalize(u, dim=1)
                     # u = F.normalize(u, dim=1)
                 u += entity_emb
-            entity_emb_list.append(u)
-        entity_emb_list = torch.stack(entity_emb_list, dim=0)
-        weight = weight.unsqueeze(1) #[n_relations-1, 1, 1]
-        a = weight
+            # entity_emb_list.append(u)
+            if torch_cat == 0:
+                last_cat = u
+                torch_cat = 1
+            else:
+                last_cat = torch.cat((last_cat, u), 1)
+        entity_agg = last_cat
+        # entity_emb_list = torch.stack(entity_emb_list, dim=0)
+        # weight = weight.unsqueeze(1) #[n_relations-1, 1, 1]
+        # a = weight
         # entity_agg = torch.mm(weight, entity_emb_list)
-        entity_agg = (entity_emb_list * a).sum(dim=0)
+        # entity_agg = (entity_emb_list * a).sum(dim=0)
         user_agg = torch.sparse.mm(interact_mat, entity_agg)
 
         # """KG aggregate"""
