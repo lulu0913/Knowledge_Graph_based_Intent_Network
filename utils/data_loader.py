@@ -18,17 +18,8 @@ train_user_set = defaultdict(list)
 test_user_set = defaultdict(list)
 
 
-def read_cf(file_name):
-    inter_mat = list()
-    lines = open(file_name, "r").readlines()
-    for l in lines:
-        tmps = l.strip()
-        inters = [int(i) for i in tmps.split(" ")]
-
-        u_id, pos_ids = inters[0], inters[1:]
-        pos_ids = list(set(pos_ids))
-        for i_id in pos_ids:
-            inter_mat.append([u_id, i_id])
+def read_cf(data_name):
+    inter_mat = data_name[:, :2]
 
     return np.array(inter_mat)
 
@@ -142,8 +133,11 @@ def load_data(model_args):
     directory = args.data_path + args.dataset + '/'
 
     print('reading train and test user-item set ...')
-    train_cf = read_cf(directory + 'train.txt')
-    test_cf = read_cf(directory + 'test.txt')
+    n_user, n_item, train_data, test_data = load_rating(args)
+    # n_entity, n_relation, adj_entity, adj_relation = load_kg(args)
+
+    train_cf = read_cf(train_data)
+    test_cf = read_cf(test_data)
     remap_item(train_cf, test_cf)
 
     print('combinating train_cf and kg data ...')
@@ -170,3 +164,37 @@ def load_data(model_args):
     return train_cf, test_cf, user_dict, n_params, graph, triplets, relation_dict,\
            [adj_mat_list, norm_mat_list, mean_mat_list]
 
+
+def load_rating(args):
+    print('reading rating_pos file ...')
+    rating_file = 'data/' + 'last-fm-small' + '/ratings_final'
+    rating_np = np.loadtxt(rating_file + '.txt', dtype=np.int64)
+    a = []
+    for item in rating_np:
+        if item[2] == 1:
+            a.append(item)
+    rating_np_pos = np.array(a)
+    # np.save('../data/' + 'last-fm-small' + '/rating_pos' + '.npy', rating_np_pos)
+
+    # reading rating file
+    n_user = len(set(rating_np[:, 0]))
+    n_item = len(set(rating_np[:, 1]))
+    train_data, test_data = dataset_split(rating_np_pos, args)
+
+    return n_user, n_item, train_data, test_data
+
+
+def dataset_split(rating_np_pos, args):
+    print('splitting dataset ...')
+
+    # train:test = 8:2
+    test_ratio = 0.2
+    n_ratings = rating_np_pos.shape[0]
+
+    test_indices = np.random.choice(list(range(n_ratings)), size=int(n_ratings * test_ratio), replace=False)
+    train_indices = list(set(range(n_ratings)) - set(test_indices))
+
+    train_data = rating_np_pos[train_indices]
+    test_data = rating_np_pos[test_indices]
+
+    return train_data, test_data
